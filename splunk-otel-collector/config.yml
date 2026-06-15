@@ -1,0 +1,99 @@
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  host_metrics:
+    root_path: /hostfs
+    collection_interval: 15s
+    scrapers:
+      cpu:
+      disk:
+      filesystem:
+        exclude_mount_points:
+          mount_points:
+            - ^/parent-distro.*
+            - ^/mnt/host/(wsl|wslg).*
+            - ^/mnt/docker-desktop.*
+            - ^/run/desktop.*
+            - ^/tmp/docker-desktop.*
+          match_type: regexp
+      load:
+      memory:
+      network:
+      paging:
+
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 15s
+    timeout: 5s
+
+processors:
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "${env:ENVIRONMENT}"
+        action: upsert
+      - key: sf.environment
+        value: "${env:ENVIRONMENT}"
+        action: upsert
+
+  resource_detection:
+    detectors: [system]
+    timeout: 5s
+    override: false
+
+exporters:
+  debug:
+    verbosity: normal
+
+  otlp_http/splunk:
+    traces_endpoint: "https://ingest.${env:SPLUNK_REALM}.signalfx.com/v2/trace/otlp"
+    headers:
+      X-SF-Token: "${env:SPLUNK_ACCESS_TOKEN}"
+
+  signalfx:
+    access_token: "${env:SPLUNK_ACCESS_TOKEN}"
+    realm: "${env:SPLUNK_REALM}"
+    sync_host_metadata: true
+
+service:
+  extensions: [health_check, zpages]
+
+  pipelines:
+    traces:
+      receivers:  [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:  [debug, otlp_http/splunk]
+
+    metrics/app:
+      receivers:  [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters:  [debug, signalfx]
+
+    metrics/infra:
+      receivers:  [host_metrics, docker_stats]
+      processors: [memory_limiter, resource_detection, batch]
+      exporters:  [signalfx]
+
+  telemetry:
+    logs:
+      level: info

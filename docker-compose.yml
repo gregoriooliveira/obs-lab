@@ -1,0 +1,66 @@
+# obs-lab - cadeia de microservicos
+# gateway (8080) -> orders (8081) -> payment (8082)
+# gateway com IP fixo 172.20.0.10 para testes externos (ThousandEyes API test)
+
+services:
+
+  gateway-service:
+    build: { context: ./services/gateway }
+    container_name: obs-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      APP_PORT: 8080
+      OTEL_SERVICE_NAME: gateway-service
+      ORDERS_URL: http://orders-service:8081
+      LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+    restart: unless-stopped
+    networks:
+      obs-net:
+        ipv4_address: 172.20.0.10
+
+  orders-service:
+    build: { context: ./services/orders }
+    container_name: obs-orders
+    ports:
+      - "8081:8081"
+    environment:
+      APP_PORT: 8081
+      OTEL_SERVICE_NAME: orders-service
+      PAYMENT_URL: http://payment-service:8082
+      ERROR_RATE: "${ERROR_RATE:-0.06}"
+      LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+    restart: unless-stopped
+    networks: [obs-net]
+
+  payment-service:
+    build: { context: ./services/payment }
+    container_name: obs-payment
+    ports:
+      - "8082:8082"
+    environment:
+      APP_PORT: 8082
+      OTEL_SERVICE_NAME: payment-service
+      ERROR_RATE: "${ERROR_RATE:-0.10}"
+      LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+    restart: unless-stopped
+    networks: [obs-net]
+
+  load-gen:
+    build: { context: ./load-gen }
+    container_name: obs-load-gen
+    environment:
+      TARGET_URL: "http://gateway-service:8080"
+      VIRTUAL_USERS: "${LOAD_VUS:-8}"
+      THINK_TIME_MS: "${THINK_TIME_MS:-400}"
+      STATS_INTERVAL_S: "${STATS_INTERVAL_S:-30}"
+    depends_on: [gateway-service]
+    restart: unless-stopped
+    networks: [obs-net]
+
+networks:
+  obs-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,31 @@
+# ThousandEyes Enterprise Agent
+# Var necessaria no .env: TE_ACCOUNT_TOKEN
+# Alvos internos: http://gateway-service:8080/health | /api/products
+#
+# Volume te-agent-data persiste o Agent ID -> ao recriar o container,
+# ele volta como o MESMO agente no portal (nao cria duplicado).
+# O hostname fixo tambem ajuda na identificacao consistente.
+
+services:
+  thousandeyes-agent:
+    image: thousandeyes/enterprise-agent:latest
+    container_name: obs-te-agent
+    hostname: obs-lab-te-agent
+    privileged: true
+    environment:
+      TEAGENT_ACCOUNT_TOKEN: "${TE_ACCOUNT_TOKEN}"
+      TEAGENT_INET: "4"
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - NET_RAW
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
+    volumes:
+      - te-agent-data:/var/lib/te-agent
+    restart: unless-stopped
+    networks: [obs-net]
+
+volumes:
+  te-agent-data:

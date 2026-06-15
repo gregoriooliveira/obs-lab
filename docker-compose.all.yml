@@ -1,0 +1,109 @@
+# Todos os vendors na cadeia de 3 microserviços
+# Splunk (OTel agent) + Datadog (infra) + AppDynamics (APM nos 3 tiers)
+
+services:
+
+  gateway-service:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT:          http://splunk-otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL:          http/protobuf
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_AGENT_APPLICATION_NAME:   "${APPDYNAMICS_AGENT_APPLICATION_NAME:-obs-lab}"
+      APPDYNAMICS_AGENT_TIER_NAME:          "gateway"
+      APPDYNAMICS_AGENT_NODE_NAME:          "gateway-node-1"
+
+  orders-service:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT:          http://splunk-otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL:          http/protobuf
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_AGENT_APPLICATION_NAME:   "${APPDYNAMICS_AGENT_APPLICATION_NAME:-obs-lab}"
+      APPDYNAMICS_AGENT_TIER_NAME:          "orders"
+      APPDYNAMICS_AGENT_NODE_NAME:          "orders-node-1"
+
+  payment-service:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT:          http://splunk-otel-collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL:          http/protobuf
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_AGENT_APPLICATION_NAME:   "${APPDYNAMICS_AGENT_APPLICATION_NAME:-obs-lab}"
+      APPDYNAMICS_AGENT_TIER_NAME:          "payment"
+      APPDYNAMICS_AGENT_NODE_NAME:          "payment-node-1"
+
+  splunk-otel-collector:
+    image: quay.io/signalfx/splunk-otel-collector:latest
+    container_name: obs-splunk-otel
+    user: "0:0"
+    command: ["--config=/etc/otel/collector/custom_config.yaml"]
+    environment:
+      SPLUNK_ACCESS_TOKEN:     "${SPLUNK_ACCESS_TOKEN}"
+      SPLUNK_REALM:            "${SPLUNK_REALM:-us0}"
+      SPLUNK_MEMORY_TOTAL_MIB: "512"
+      ENVIRONMENT:             "${ENVIRONMENT:-lab}"
+    volumes:
+      - ./splunk-otel-collector/config.yml:/etc/otel/collector/custom_config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/hostfs/proc:ro
+      - /sys:/hostfs/sys:ro
+      - /etc:/hostfs/etc:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+      - "13133:13133"
+      - "55679:55679"
+    restart: unless-stopped
+    networks: [obs-net]
+
+  dd-agent:
+    image: gcr.io/datadoghq/agent:7
+    container_name: obs-dd-agent
+    environment:
+      DD_API_KEY:               "${DD_API_KEY}"
+      DD_SITE:                  "${DD_SITE:-datadoghq.com}"
+      DD_ENV:                   "${ENVIRONMENT:-lab}"
+      DD_PROCESS_AGENT_ENABLED: "true"
+      DD_CONTAINER_COLLECT_ALL: "true"
+      DD_APM_ENABLED:           "false"
+      DD_LOGS_ENABLED:          "false"
+      DD_HOSTNAME:              "obs-lab-host"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+    ports:
+      - "8125:8125/udp"
+    restart: unless-stopped
+    networks: [obs-net]
+
+  appd-machine-agent:
+    image: appdynamics/machine-agent:latest
+    container_name: obs-appd-machine-agent
+    privileged: true
+    environment:
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_AGENT_APPLICATION_NAME:   "${APPDYNAMICS_AGENT_APPLICATION_NAME:-obs-lab}"
+      APPDYNAMICS_SIM_ENABLED:              "true"
+      APPDYNAMICS_DOCKER_ENABLED:           "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/hostroot/proc:ro
+      - /sys:/hostroot/sys:ro
+    restart: unless-stopped
+    networks: [obs-net]

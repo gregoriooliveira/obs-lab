@@ -1,0 +1,9 @@
+{
+  "name": "obs-load-gen",
+  "version": "1.0.0",
+  "description": "Traffic generator for obs-lab",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "main": "index.js",
+  "dependencies": {}
+}
