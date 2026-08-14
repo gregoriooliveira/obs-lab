@@ -1,0 +1,15 @@
+# Overlay: ativa a pipeline de LOGS -> Splunk Core via HEC.
+# Requer SPLUNK_HEC_URL e SPLUNK_HEC_TOKEN no .env.
+services:
+  splunk-otel-collector:
+    command:
+      - "--config=/etc/otel/collector/custom_config.yaml"
+      - "--config=/etc/otel/collector/hec_config.yaml"
+    volumes:
+      - ./splunk-otel-collector/config.yml:/etc/otel/collector/custom_config.yaml:ro
+      - ./splunk-otel-collector/config-hec.yml:/etc/otel/collector/hec_config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/hostfs/proc:ro
+      - /sys:/hostfs/sys:ro
+      - /etc:/hostfs/etc:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro

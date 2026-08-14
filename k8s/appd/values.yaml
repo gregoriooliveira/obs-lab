@@ -1,0 +1,58 @@
+# AppDynamics Cluster Agent - values do obs-lab
+#
+# Chart: appdynamics-charts/cluster-agent
+#   repo https://appdynamics.jfrog.io/artifactory/appdynamics-cloud-helmcharts
+#   (o antigo https://appdynamics.github.io/appdynamics-charts esta 404;
+#    o ciscodevnet.github.io existe mas parou na versao 23.9)
+#
+# Instalado por k8s-lab.ps1. controllerInfo.url/account/accessKey vao via --set
+# a partir do .env, entao nada de segredo fica versionado aqui.
+#
+# O que cada peca faz:
+#   clusterAgent -> inventario e saude do cluster no Controller (Servers > Clusters)
+#   infraViz     -> Machine Agent como DaemonSet: Server Visibility + Docker Visibility
+#   APM dos 3 tiers NAO vem daqui - vem do agent Node.js dentro dos pods,
+#   configurado por env nos Deployments de k8s/base/.
+
+installClusterAgent: true
+installInfraViz: true
+installSplunkOtelCollector: false     # o Splunk ja vem do chart proprio
+
+controllerInfo:
+  # url / account / accessKey: via --set (ver k8s-lab.ps1)
+  url: null
+  account: null
+  accessKey: null
+  # O template renderiza `globalAccount: {{ .Values.controllerInfo.globalAccount }}`
+  # sem aspas: null e "" viram null no YAML e o CRD do InfraViz rejeita com
+  #   spec.globalAccount in body must be of type string: "null"
+  # O campo so e consumido pela imagem Windows/Analytics do Machine Agent, entao
+  # o k8s-lab.ps1 preenche com o nome da conta (--set) so pra satisfazer o CRD.
+  # Se for usar Analytics no Windows, troque pelo Global Account Name real
+  # (Controller > License > Account: <account>_<GUID>).
+  globalAccount: "obs-lab"
+
+createServiceAccount: true
+agentServiceAccount: appdynamics-cluster-agent
+operatorServiceAccount: appdynamics-operator
+infravizServiceAccount: appdynamics-infraviz
+
+clusterAgent:
+  clusterMetricsSyncInterval: 60
+  clusterInfoSyncInterval: 180
+  resources:
+    requests: { cpu: 100m, memory: 150Mi }
+    limits:   { cpu: 500m, memory: 300Mi }
+
+infraViz:
+  nodeOS: "linux"
+  # inclui o control-plane: o chart adiciona a toleration do taint
+  # node-role.kubernetes.io/control-plane, senao o DaemonSet so cobre os workers
+  enableMasters: true
+  enableContainerHostId: true
+  enableServerViz: true
+  enableDockerViz: true
+  stdoutLogging: true
+  resources:
+    requests: { cpu: 100m, memory: 200Mi }
+    limits:   { cpu: 500m, memory: 600Mi }

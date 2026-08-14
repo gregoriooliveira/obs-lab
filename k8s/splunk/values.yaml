@@ -1,0 +1,103 @@
+# Splunk OpenTelemetry Collector for Kubernetes - values do obs-lab
+#
+# Instalado por k8s-lab.ps1; o accessToken NAO fica aqui, vai via --set
+# (ver .env / SPLUNK_ACCESS_TOKEN).
+#
+#   agent (DaemonSet)      -> metricas de no/pod/container (kubelet), logs dos
+#                             containers, e receiver OTLP pros apps (hostPort)
+#   clusterReceiver (Deploy)-> metricas de cluster (k8s_cluster) + eventos do k8s
+#
+# Sao esses dois que populam os navigators de Kubernetes:
+#   Clusters, Nodes, Pods, Containers, Namespaces, Workloads, DaemonSets,
+#   Deployments, ReplicaSets, StatefulSets, Jobs, CronJobs
+
+clusterName: obs-lab-k8s
+environment: lab-k8s
+
+splunkObservability:
+  realm: us1
+  metricsEnabled: true
+  tracesEnabled: true
+  # eventos do Kubernetes como Infrastructure Monitoring events (anotam os
+  # graficos: OOMKill, CrashLoopBackOff, Scheduled, Killing...)
+  infrastructureMonitoringEventsEnabled: true
+  profilingEnabled: false
+
+# NOTA: o chart nao tem splunkObservability.logsEnabled. Logs de container so
+# vao pro Splunk Platform (HEC) - configure splunkPlatform.* quando o Splunk
+# Core estiver disponivel. Os EVENTOS do k8s vao pro O11y pelo feature gate
+# abaixo, sem depender do HEC.
+featureGates:
+  sendK8sEventsToSplunkO11y: true
+
+# Os apps mandam OTLP pro IP do no (status.hostIP) na porta 4318.
+agent:
+  enabled: true
+  resources:
+    limits:
+      cpu: 500m
+      memory: 500Mi
+  config:
+    receivers:
+      # kind gera cert de serving do kubelet sem IP SAN, entao o scrape de
+      # https://<nodeIP>:10250/stats/summary falha com
+      #   x509: cannot validate certificate ... doesn't contain any IP SANs
+      # kubelet_stats e o receiver que produz TODA a metrica de pod/container -
+      # sem isso os navigators de Pods e Containers ficam vazios.
+      # Em cluster gerenciado (EKS/GKE/AKS) isso nao e necessario.
+      kubelet_stats:
+        insecure_skip_verify: true
+
+clusterReceiver:
+  enabled: true
+  # Eventos do Kubernetes viram logs/eventos no Splunk - da pra correlacionar
+  # OOMKill / CrashLoopBackOff com a queda de RED do servico no APM.
+  k8sObjects:
+    - name: events
+      mode: watch
+  # ── DBM do inventory-db ────────────────────────────────────────────────────
+  # Fica no clusterReceiver (replica unica) e nao no agent: no DaemonSet os 3
+  # nos escrapeariam o mesmo Postgres e triplicariam a metrica.
+  # user/password sao sobrescritos por --set a partir do .env.
+  config:
+    receivers:
+      postgresql:
+        endpoint: "inventory-db.obs-lab.svc.cluster.local:5432"
+        username: obslab
+        password: obslab
+        databases: [inventory]
+        collection_interval: 10s
+        tls:
+          insecure: true
+        # Database Query Performance: top SQL + query samples.
+        # Exige pg_stat_statements nos databases postgres E inventory
+        # (ver db/init/00-dbm.sql).
+        events:
+          db.server.query_sample:
+            enabled: true
+          db.server.top_query:
+            enabled: true
+    exporters:
+      otlp_http/dbmon:
+        logs_endpoint: "https://ingest.us1.observability.splunkcloud.com/v3/event"
+        headers:
+          X-SF-Token: "${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}"
+          X-splunk-instrumentation-library: "dbmon"
+    service:
+      pipelines:
+        metrics/postgresql:
+          receivers: [postgresql]
+          processors: [memory_limiter, batch, resource, resource/add_environment]
+          exporters: [signalfx]
+        logs/dbmon:
+          receivers: [postgresql]
+          processors: [memory_limiter, batch, resource, resource/add_environment]
+          exporters: [otlp_http/dbmon]
+
+# gateway centralizado nao e necessario: os apps falam com o agent local.
+gateway:
+  enabled: false
+
+# Detectores de nuvem desligados - cluster kind roda local.
+cloudProvider: ""
+distribution: ""

@@ -1,0 +1,58 @@
+# Overlay de LOGS - stdout dos containers -> Splunk Core (Enterprise) via HEC
+#
+# Carregado como SEGUNDO --config (o collector faz merge com o config.yml).
+# So use quando SPLUNK_HEC_URL e SPLUNK_HEC_TOKEN estiverem preenchidos no .env,
+# senao o collector nao sobe (exporter exige endpoint nao vazio).
+#
+#   make splunk-hec     (base + splunk + este overlay)
+
+receivers:
+  filelog:
+    include:
+      - /var/lib/docker/containers/*/*-json.log
+    include_file_path: true
+    operators:
+      # parse do envelope JSON do docker (campos: log, stream, time)
+      - type: json_parser
+        id: docker-envelope
+        timestamp:
+          parse_from: attributes.time
+          # docker grava nanossegundos: 2026-08-14T10:00:00.123456789Z
+          layout: '%Y-%m-%dT%H:%M:%S.%fZ'
+      # extrai o container id do caminho do arquivo
+      - type: regex_parser
+        id: extract-container-id
+        parse_from: attributes["log.file.path"]
+        regex: '/var/lib/docker/containers/(?P<container_id>[^/]+)/'
+      # move o texto do log pro corpo
+      - type: move
+        from: attributes.log
+        to: body
+
+processors:
+  # metadata util nos logs
+  resource/logs:
+    attributes:
+      - key: source
+        value: "obs-lab"
+        action: upsert
+      - key: host.name
+        value: "${HOSTNAME_LAB}"
+        action: upsert
+
+exporters:
+  splunk_hec/core:
+    token: "${SPLUNK_HEC_TOKEN}"
+    endpoint: "${SPLUNK_HEC_URL}"
+    source: "obs-lab"
+    sourcetype: "obs-lab:container"
+    index: "${SPLUNK_HEC_INDEX}"
+    tls:
+      insecure_skip_verify: true
+
+service:
+  pipelines:
+    logs:
+      receivers:  [filelog]
+      processors: [memory_limiter, batch, resource/logs]
+      exporters:  [splunk_hec/core]

@@ -1,0 +1,25 @@
+# AppDynamics Database Agent - monitora inventory-db (Postgres)
+# Licenca Database Monitoring dedicada.
+#
+# APOS subir: configurar o Database Collector na UI do Controller
+#   Databases > Configure > Add > PostgreSQL
+#     Hostname: inventory-db   Port: 5432
+#     Database: inventory      User/Pass: obslab/obslab
+#   (o agent abaixo so executa; o alvo e definido no Controller)
+
+services:
+  appd-db-agent:
+    image: appdynamics/db-agent:latest
+    container_name: obs-appd-db-agent
+    environment:
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_DB_AGENT_NAME:            "obs-lab-db-agent"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [obs-net]

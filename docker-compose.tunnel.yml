@@ -1,0 +1,23 @@
+# Cloudflare Tunnel - publica o gateway do lab na internet
+# Permite ThousandEyes Cloud Agents testarem de fora pra dentro (onprem sem abrir porta no firewall)
+#
+# SETUP (uma vez, no Cloudflare Zero Trust dashboard):
+#   1. Zero Trust > Networks > Tunnels > Create a tunnel > Cloudflared
+#   2. Nomeie (ex: obs-lab), copie o TOKEN gerado -> .env (CLOUDFLARE_TUNNEL_TOKEN)
+#   3. Em Public Hostname, aponte um subdominio (ex: obs-lab.seudominio.com)
+#      para o servico: HTTP -> gateway-service:8080
+#   4. (opcional) mais hostnames para orders/payment se quiser expor
+#
+# O tunnel NAO precisa de porta aberta no firewall - o cloudflared cria a
+# conexao de saida (egress) ate a Cloudflare. Ideal para onprem.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: obs-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
+    restart: unless-stopped
+    networks: [obs-net]
+    depends_on: [gateway-service]

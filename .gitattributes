@@ -1,0 +1,20 @@
+# Scripts e manifests DEVEM ficar com LF no repo. Sem isso, um clone feito no
+# Windows (core.autocrlf=true) grava CRLF e o servidor Linux quebra com
+#   bad interpreter: /bin/bash^M
+* text=auto eol=lf
+
+*.sh        text eol=lf
+Makefile    text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sql       text eol=lf
+*.js        text eol=lf
+*.json      text eol=lf
+Dockerfile  text eol=lf
+
+# Drivers do Windows ficam com CRLF
+*.ps1       text eol=crlf
+
+*.png binary
+*.jpg binary
+*.gif binary

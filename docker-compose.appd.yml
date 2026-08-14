@@ -35,6 +35,8 @@ services:
     image: appdynamics/machine-agent:latest
     container_name: obs-appd-machine-agent
     privileged: true
+    # root: sem isso o agent nao le /var/run/docker.sock (Permission denied no /info)
+    user: "0:0"
     environment:
       APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
       APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"

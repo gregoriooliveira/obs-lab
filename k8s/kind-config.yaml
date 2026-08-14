@@ -1,0 +1,62 @@
+# Cluster kind do obs-lab: 1 control-plane + 2 workers.
+# Multi-node de proposito: o navigator de Kubernetes Nodes so fica interessante
+# com mais de um no, e o scheduler espalha os pods entre eles.
+#
+# Portas no host (18xxx) escolhidas pra NAO colidir com o lab de docker-compose,
+# que pode continuar rodando em paralelo (ambientes separados por
+# deployment.environment: lab vs lab-k8s).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: obs-lab
+
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true,obslab.role=control-plane"
+      # Por padrao o kind sobe controller-manager/scheduler/etcd escutando as
+      # metricas so em 127.0.0.1, entao o collector (que roda em outro
+      # namespace de rede) leva "connection refused" em 10257/10259/2381.
+      # Abrir o bind faz o receiver_creator descobrir e coletar o control plane.
+      # (kubeadm v1beta4: extraArgs e lista de {name,value}, nao mapa)
+      - |
+        kind: ClusterConfiguration
+        controllerManager:
+          extraArgs:
+            - name: bind-address
+              value: "0.0.0.0"
+        scheduler:
+          extraArgs:
+            - name: bind-address
+              value: "0.0.0.0"
+        etcd:
+          local:
+            extraArgs:
+              - name: listen-metrics-urls
+                value: "http://0.0.0.0:2381"
+    extraPortMappings:
+      # gateway (NodePort 30080) -> localhost:18080
+      - containerPort: 30080
+        hostPort: 18080
+        protocol: TCP
+      # postgres (NodePort 30432) -> localhost:15432
+      - containerPort: 30432
+        hostPort: 15432
+        protocol: TCP
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "obslab.role=worker"
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "obslab.role=worker"

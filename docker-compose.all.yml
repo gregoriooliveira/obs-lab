@@ -1,5 +1,8 @@
+# DEPRECADO - duplica splunk.yml + appd.yml + appd-db.yml e sai de sincronia.
+# Use:  make all   (base + splunk + appd + appd-db)
+#
 # Todos os vendors na cadeia de 3 microserviços
-# Splunk (OTel agent) + Datadog (infra) + AppDynamics (APM nos 3 tiers)
+# Splunk (OTel agent + HEC logs) + AppDynamics (APM nos 3 tiers)
 
 services:
 
@@ -52,12 +55,20 @@ services:
       SPLUNK_REALM:            "${SPLUNK_REALM:-us0}"
       SPLUNK_MEMORY_TOTAL_MIB: "512"
       ENVIRONMENT:             "${ENVIRONMENT:-lab}"
+      HOSTNAME_LAB:            "${HOSTNAME_LAB:-obs-lab-host}"
+      SPLUNK_HEC_URL:          "${SPLUNK_HEC_URL}"
+      SPLUNK_HEC_TOKEN:        "${SPLUNK_HEC_TOKEN}"
+      SPLUNK_HEC_INDEX:        "${SPLUNK_HEC_INDEX:-main}"
+      DB_USER:                 "${DB_USER:-obslab}"
+      DB_PASSWORD:             "${DB_PASSWORD:-obslab}"
+      DB_NAME:                 "${DB_NAME:-inventory}"
     volumes:
       - ./splunk-otel-collector/config.yml:/etc/otel/collector/custom_config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/hostfs/proc:ro
       - /sys:/hostfs/sys:ro
       - /etc:/hostfs/etc:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -66,28 +77,6 @@ services:
       - "55679:55679"
     restart: unless-stopped
     networks: [obs-net]
-
-  dd-agent:
-    image: gcr.io/datadoghq/agent:7
-    container_name: obs-dd-agent
-    environment:
-      DD_API_KEY:               "${DD_API_KEY}"
-      DD_SITE:                  "${DD_SITE:-datadoghq.com}"
-      DD_ENV:                   "${ENVIRONMENT:-lab}"
-      DD_PROCESS_AGENT_ENABLED: "true"
-      DD_CONTAINER_COLLECT_ALL: "true"
-      DD_APM_ENABLED:           "false"
-      DD_LOGS_ENABLED:          "false"
-      DD_HOSTNAME:              "obs-lab-host"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /proc/:/host/proc/:ro
-      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
-    ports:
-      - "8125:8125/udp"
-    restart: unless-stopped
-    networks: [obs-net]
-
   appd-machine-agent:
     image: appdynamics/machine-agent:latest
     container_name: obs-appd-machine-agent
@@ -105,5 +94,21 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/hostroot/proc:ro
       - /sys:/hostroot/sys:ro
+    restart: unless-stopped
+    networks: [obs-net]
+
+  appd-db-agent:
+    image: appdynamics/db-agent:latest
+    container_name: obs-appd-db-agent
+    environment:
+      APPDYNAMICS_CONTROLLER_HOST_NAME:     "${APPDYNAMICS_CONTROLLER_HOST_NAME}"
+      APPDYNAMICS_CONTROLLER_PORT:          "${APPDYNAMICS_CONTROLLER_PORT:-443}"
+      APPDYNAMICS_CONTROLLER_SSL_ENABLED:   "${APPDYNAMICS_CONTROLLER_SSL_ENABLED:-true}"
+      APPDYNAMICS_AGENT_ACCOUNT_NAME:       "${APPDYNAMICS_AGENT_ACCOUNT_NAME}"
+      APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY: "${APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY}"
+      APPDYNAMICS_DB_AGENT_NAME:            "obs-lab-db-agent"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
     restart: unless-stopped
     networks: [obs-net]

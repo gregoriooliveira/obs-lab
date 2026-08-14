@@ -1,0 +1,54 @@
+# Perfil LITE: 1 control-plane + 1 worker.
+#
+# Use quando a maquina tiver menos de 16 GB uteis pro Docker. Os navigators de
+# Kubernetes populam igual - a unica perda e o navigator de Nodes mostrar 2 nos
+# em vez de 3, e os pods se espalharem menos.
+#
+#   LAB_PROFILE=lite ./k8s-lab.sh up
+#
+# Portas no host (18xxx) escolhidas pra NAO colidir com o lab de docker-compose.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: obs-lab
+
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true,obslab.role=control-plane"
+      # Por padrao o kind sobe controller-manager/scheduler/etcd escutando as
+      # metricas so em 127.0.0.1, entao o collector leva "connection refused"
+      # em 10257/10259/2381. Abrir o bind expoe o control plane pro receiver.
+      # (kubeadm v1beta4: extraArgs e lista de {name,value}, nao mapa)
+      - |
+        kind: ClusterConfiguration
+        controllerManager:
+          extraArgs:
+            - name: bind-address
+              value: "0.0.0.0"
+        scheduler:
+          extraArgs:
+            - name: bind-address
+              value: "0.0.0.0"
+        etcd:
+          local:
+            extraArgs:
+              - name: listen-metrics-urls
+                value: "http://0.0.0.0:2381"
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 18080
+        protocol: TCP
+      - containerPort: 30432
+        hostPort: 15432
+        protocol: TCP
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "obslab.role=worker"

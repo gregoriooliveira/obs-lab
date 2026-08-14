@@ -1,0 +1,57 @@
+# ThousandEyes Enterprise Agent dentro do cluster.
+#
+# Testa os servicos internos por DNS do cluster:
+#   http://gateway-service.obs-lab.svc.cluster.local:8080/health
+#   http://gateway-service.obs-lab.svc.cluster.local:8080/api/products
+#
+# O token vem do secret te-agent-token (criado por k8s-lab.ps1 a partir do .env).
+# O PVC preserva o Agent ID: ao recriar o pod ele volta como o MESMO agente
+# no portal, em vez de duplicar.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: te-agent-data
+  namespace: obs-lab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: thousandeyes-agent
+  namespace: obs-lab
+  labels: { app: thousandeyes-agent }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }     # PVC RWO + Agent ID unico
+  selector:
+    matchLabels: { app: thousandeyes-agent }
+  template:
+    metadata:
+      labels: { app: thousandeyes-agent }
+    spec:
+      hostname: obs-lab-te-agent
+      containers:
+        - name: te-agent
+          image: thousandeyes/enterprise-agent:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TEAGENT_ACCOUNT_TOKEN
+              valueFrom:
+                secretKeyRef: { name: te-agent-token, key: TE_ACCOUNT_TOKEN }
+            - { name: TEAGENT_INET, value: "4" }
+          securityContext:
+            privileged: true          # o agent precisa de raw sockets pra traceroute
+            capabilities:
+              add: [NET_ADMIN, SYS_ADMIN, NET_RAW]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/te-agent }
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits:   { memory: 2Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: te-agent-data }

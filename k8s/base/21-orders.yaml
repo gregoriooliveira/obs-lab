@@ -1,0 +1,66 @@
+# orders-service - meio da cadeia, fala com o Postgres (spans de query reais)
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+  namespace: obs-lab
+  labels: { app: orders-service }
+spec:
+  selector: { app: orders-service }
+  ports:
+    - { name: http, port: 8081, targetPort: 8081 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service
+  namespace: obs-lab
+  labels: { app: orders-service, tier: orders }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: orders-service }
+  template:
+    metadata:
+      labels: { app: orders-service, tier: orders }
+    spec:
+      containers:
+        - name: orders
+          image: obs-lab-orders-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8081 }
+          env:
+            - { name: NODE_IP,       valueFrom: { fieldRef: { fieldPath: status.hostIP } } }
+            - { name: POD_NAME,      valueFrom: { fieldRef: { fieldPath: metadata.name } } }
+            - { name: POD_NAMESPACE, valueFrom: { fieldRef: { fieldPath: metadata.namespace } } }
+            - { name: NODE_NAME,     valueFrom: { fieldRef: { fieldPath: spec.nodeName } } }
+            - { name: APP_PORT,          value: "8081" }
+            - { name: OTEL_SERVICE_NAME, value: orders-service }
+            - { name: PAYMENT_URL,       value: http://payment-service:8082 }
+            - { name: ERROR_RATE,        value: "0.06" }
+            - { name: LATENCY_JITTER_MS, value: "150" }
+            - { name: DB_HOST, value: inventory-db }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_USER,     valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_USER } } }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_PASSWORD } } }
+            - { name: DB_NAME,     valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_NAME } } }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://$(NODE_IP):4318" }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "deployment.environment=lab-k8s,k8s.pod.name=$(POD_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.node.name=$(NODE_NAME)"
+            - { name: APPDYNAMICS_AGENT_TIER_NAME, value: orders }
+            - { name: APPDYNAMICS_AGENT_NODE_NAME, value: "$(POD_NAME)" }
+          envFrom:
+            - secretRef: { name: appd-creds }
+          readinessProbe:
+            httpGet: { path: /health, port: 8081 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8081 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { memory: 512Mi }

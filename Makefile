@@ -1,10 +1,13 @@
-.PHONY: help up down splunk datadog appd all logs ps clean rebuild status
+.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status
 
-BASE    := docker-compose -f docker-compose.yml
+BASE    := docker compose -f docker-compose.yml
 SPLUNK  := $(BASE) -f docker-compose.splunk.yml
-DD      := $(BASE) -f docker-compose.datadog.yml
+HEC     := $(SPLUNK) -f docker-compose.splunk-hec.yml
 APPD    := $(BASE) -f docker-compose.appd.yml
-ALL     := $(BASE) -f docker-compose.splunk.yml -f docker-compose.datadog.yml -f docker-compose.appd.yml
+APPDDB  := $(APPD) -f docker-compose.appd-db.yml
+TE      := $(BASE) -f docker-compose.thousandeyes.yml
+TUNNEL  := $(BASE) -f docker-compose.tunnel.yml
+ALL     := $(BASE) -f docker-compose.splunk.yml -f docker-compose.appd.yml -f docker-compose.appd-db.yml
 
 ## Default: show help
 help:
@@ -14,16 +17,19 @@ help:
 	@echo "  Usage: make <target>"
 	@echo ""
 	@echo "  Targets:"
-	@echo "    up       Start base stack (app + collector debug output + load-gen)"
-	@echo "    splunk   Start with Splunk Observability Cloud"
-	@echo "    datadog  Start with Datadog"
-	@echo "    appd     Start with AppDynamics (set APPDYNAMICS_* in .env)"
-	@echo "    all      Start with all three vendors"
-	@echo "    logs     Follow logs from all containers"
-	@echo "    ps       Show running containers"
-	@echo "    status   Health check all endpoints"
-	@echo "    rebuild  Rebuild images and restart"
-	@echo "    clean    Stop everything and remove volumes"
+	@echo "    up         Start base stack (app + postgres + load-gen)"
+	@echo "    splunk     Start with Splunk O11y (metrics + APM + DBM)"
+	@echo "    splunk-hec Same as splunk + logs to Splunk Core via HEC"
+	@echo "    appd       Start with AppDynamics APM (set APPDYNAMICS_* in .env)"
+	@echo "    appd-db    AppDynamics APM + Database Agent"
+	@echo "    te         Start ThousandEyes Enterprise Agent"
+	@echo "    all        All vendors (Splunk + AppD APM + AppD DB agent)"
+	@echo "    tunnel     Start Cloudflare tunnel (publish URLs to internet)"
+	@echo "    logs       Follow logs from all containers"
+	@echo "    ps         Show running containers"
+	@echo "    status     Health check all endpoints"
+	@echo "    rebuild    Rebuild images and restart"
+	@echo "    clean      Stop everything and remove volumes"
 	@echo ""
 
 ## Base stack only (debug/stdout output)
@@ -35,40 +41,58 @@ up: _check-env
 	@echo "  ✓ Collector stats: http://localhost:8888/metrics"
 	@echo ""
 
-## Splunk Observability Cloud
+## Splunk Observability (metrics + APM + DBM)
 splunk: _check-env _check-splunk
 	$(SPLUNK) up -d --build
-	@echo "  ✓ Exporting to Splunk Observability (realm: $(SPLUNK_REALM))"
+	@echo "  ✓ Metricas/APM/DBM -> Splunk Observability"
 
-## Datadog
-datadog: _check-env _check-dd
-	$(DD) up -d --build
-	@echo "  ✓ Exporting to Datadog (site: $(DD_SITE))"
+## Splunk Observability + logs para Splunk Core via HEC
+splunk-hec: _check-env _check-splunk _check-hec
+	$(HEC) up -d --build
+	@echo "  ✓ Metricas/APM/DBM -> Splunk Observability"
+	@echo "  ✓ Logs -> Splunk Core via HEC"
 
-## AppDynamics (Cloud OTLP mode)
+## AppDynamics APM
 appd: _check-env _check-appd
 	$(APPD) up -d --build
-	@echo "  ✓ Exporting to AppDynamics ($(APPDYNAMICS_OTLP_ENDPOINT))"
+	@echo "  ✓ Exporting to AppDynamics"
 
-## All vendors simultaneously
-all: _check-env _check-splunk _check-dd _check-appd
+## AppDynamics APM + Database Agent
+appd-db: _check-env _check-appd
+	$(APPDDB) up -d --build
+	@echo "  ✓ AppDynamics APM + DB Agent"
+
+## ThousandEyes Enterprise Agent
+te: _check-env _check-te
+	$(TE) up -d --build
+	@echo "  ✓ ThousandEyes Enterprise Agent"
+
+## All vendors simultaneously (Splunk + AppDynamics APM + AppD DB agent)
+all: _check-env _check-splunk _check-appd
 	$(ALL) up -d --build
-	@echo "  ✓ Exporting to Splunk + Datadog + AppDynamics"
+	@echo "  ✓ Exporting to Splunk + AppDynamics"
 
-## Follow logs
+## Cloudflare tunnel (publish to internet)
+tunnel: _check-env _check-tunnel
+	$(TUNNEL) up -d
+	@echo "  ✓ Cloudflare tunnel ativo – URLs publicadas (veja Public Hostname no Zero Trust)"
+
+## Follow logs (todos os overlays)
 logs:
-	$(BASE) logs -f --tail=100
+	$(ALL) logs -f --tail=100
 
 ## Show running containers
 ps:
-	$(BASE) ps
+	$(ALL) ps
 
 ## Hit main endpoints and report HTTP status
 status:
 	@echo "=== Health check ==="
-	@curl -sf http://localhost:8080/health         && echo "  /health          OK" || echo "  /health          FAIL"
-	@curl -sf http://localhost:8080/api/products   && echo "  /api/products    OK" || echo "  /api/products    FAIL"
-	@curl -sf http://localhost:13133/              && echo "  otel-collector   OK" || echo "  otel-collector   FAIL"
+	@curl -sf http://localhost:8080/health       >/dev/null && echo "  gateway  /health        OK" || echo "  gateway  /health        FAIL"
+	@curl -sf http://localhost:8081/health       >/dev/null && echo "  orders   /health        OK" || echo "  orders   /health        FAIL"
+	@curl -sf http://localhost:8082/health       >/dev/null && echo "  payment  /health        OK" || echo "  payment  /health        FAIL"
+	@curl -sf http://localhost:8080/api/products >/dev/null && echo "  gateway  /api/products  OK" || echo "  gateway  /api/products  FAIL"
+	@curl -sf http://localhost:13133/            >/dev/null && echo "  otel-collector health   OK" || echo "  otel-collector health   n/a"
 
 ## Rebuild images
 rebuild:
@@ -76,23 +100,32 @@ rebuild:
 
 ## Full cleanup
 clean:
-	$(BASE) down -v --remove-orphans
-	docker rmi obs-demo-app obs-load-gen 2>/dev/null || true
+	$(ALL) down -v --remove-orphans
 
 # ── Internal guards ──────────────────────────────────────────────────────────
+# .env e lido pelo docker compose automaticamente; aqui so validamos presenca.
+# Cada linha de receita roda num shell proprio, por isso o source + test na
+# mesma linha (set -a exporta tudo que o .env define).
 
 _check-env:
 	@test -f .env || (echo "  ✗ .env not found – copy .env.example to .env and fill in values" && exit 1)
-	@export $$(cat .env | grep -v '^#' | xargs)
 
 _check-splunk:
-	@test -n "$$SPLUNK_ACCESS_TOKEN" || (source .env && test -n "$$SPLUNK_ACCESS_TOKEN") || \
+	@set -a; . ./.env; set +a; test -n "$$SPLUNK_ACCESS_TOKEN" || \
 		(echo "  ✗ SPLUNK_ACCESS_TOKEN not set in .env" && exit 1)
 
-_check-dd:
-	@test -n "$$DD_API_KEY" || (source .env && test -n "$$DD_API_KEY") || \
-		(echo "  ✗ DD_API_KEY not set in .env" && exit 1)
+_check-hec:
+	@set -a; . ./.env; set +a; test -n "$$SPLUNK_HEC_URL" -a -n "$$SPLUNK_HEC_TOKEN" || \
+		(echo "  ✗ SPLUNK_HEC_URL / SPLUNK_HEC_TOKEN not set in .env" && exit 1)
 
 _check-appd:
-	@test -n "$$APPDYNAMICS_OTLP_ENDPOINT" || (source .env && test -n "$$APPDYNAMICS_OTLP_ENDPOINT") || \
-		(echo "  ✗ APPDYNAMICS_OTLP_ENDPOINT not set in .env" && exit 1)
+	@set -a; . ./.env; set +a; test -n "$$APPDYNAMICS_AGENT_ACCOUNT_NAME" || \
+		(echo "  ✗ APPDYNAMICS_AGENT_ACCOUNT_NAME not set in .env" && exit 1)
+
+_check-te:
+	@set -a; . ./.env; set +a; test -n "$$TE_ACCOUNT_TOKEN" || \
+		(echo "  ✗ TE_ACCOUNT_TOKEN not set in .env" && exit 1)
+
+_check-tunnel:
+	@set -a; . ./.env; set +a; test -n "$$CLOUDFLARE_TUNNEL_TOKEN" || \
+		(echo "  ✗ CLOUDFLARE_TUNNEL_TOKEN not set in .env" && exit 1)

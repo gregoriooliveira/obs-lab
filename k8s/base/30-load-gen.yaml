@@ -1,0 +1,27 @@
+# load-gen - trafego continuo contra o gateway (service interno do cluster)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load-gen
+  namespace: obs-lab
+  labels: { app: load-gen }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: load-gen }
+  template:
+    metadata:
+      labels: { app: load-gen }
+    spec:
+      containers:
+        - name: load-gen
+          image: obs-lab-load-gen:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: TARGET_URL,       value: http://gateway-service:8080 }
+            - { name: VIRTUAL_USERS,    value: "8" }
+            - { name: THINK_TIME_MS,    value: "400" }
+            - { name: STATS_INTERVAL_S, value: "30" }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { memory: 256Mi }

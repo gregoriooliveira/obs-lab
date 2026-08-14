@@ -15,6 +15,10 @@ const httpErrs = meter.createCounter('http.errors.total',   { description: 'Erro
 const reqDur   = meter.createHistogram('http.request.duration', { description: 'Latência ms', unit: 'ms' });
 
 const JITTER = () => parseInt(process.env.LATENCY_JITTER_MS || '150', 10);
+// erros de socket trazem code string ("ECONNREFUSED"); res.status() com string
+// lanca ERR_HTTP_INVALID_STATUS_CODE e derruba o processo.
+const httpStatus = (code, fallback = 502) =>
+  Number.isInteger(code) && code >= 400 && code <= 599 ? code : fallback;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rand  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 
@@ -49,7 +53,12 @@ function postJSON(url, body, timeoutMs = 15000) {
     }, (resp) => {
       let chunks = '';
       resp.on('data', c => chunks += c);
-      resp.on('end', () => resolve({ status: resp.statusCode, body: JSON.parse(chunks || '{}') }));
+      resp.on('end', () => {
+        // resposta nao-JSON nao pode estourar dentro do handler (crasha o processo)
+        let body = {};
+        try { body = JSON.parse(chunks || '{}'); } catch (_) { body = { raw: chunks }; }
+        resolve({ status: resp.statusCode, body });
+      });
     });
     req.on('timeout', () => { req.destroy(); reject({ code: 504, msg: 'orders timeout' }); });
     req.on('error', reject);
@@ -101,7 +110,7 @@ app.post('/api/checkout', async (req, res) => {
       span.setStatus({ code: SpanStatusCode.ERROR, message: err.msg || 'error' });
       span.setAttribute('error.type', err.code === 504 ? 'orders_timeout' : 'gateway_error');
       span.end();
-      res.status(err.code || 502).json({ error: err.msg || 'orders-service unreachable' });
+      res.status(httpStatus(err.code)).json({ error: err.msg || err.message || 'orders-service unreachable' });
     }
   });
 });

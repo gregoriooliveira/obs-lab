@@ -23,12 +23,25 @@ services:
       SPLUNK_REALM:            "${SPLUNK_REALM:-us0}"
       SPLUNK_MEMORY_TOTAL_MIB: "512"
       ENVIRONMENT:             "${ENVIRONMENT:-lab}"
+      HOSTNAME_LAB:            "${HOSTNAME_LAB:-obs-lab-host}"
+      SPLUNK_HEC_URL:          "${SPLUNK_HEC_URL}"
+      SPLUNK_HEC_TOKEN:        "${SPLUNK_HEC_TOKEN}"
+      SPLUNK_HEC_INDEX:        "${SPLUNK_HEC_INDEX:-main}"
+      DB_USER:                 "${DB_USER:-obslab}"
+      DB_PASSWORD:             "${DB_PASSWORD:-obslab}"
+      DB_NAME:                 "${DB_NAME:-inventory}"
     volumes:
       - ./splunk-otel-collector/config.yml:/etc/otel/collector/custom_config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/hostfs/proc:ro
       - /sys:/hostfs/sys:ro
       - /etc:/hostfs/etc:ro
-    ports: ["4317:4317","4318:4318","8888:8888","13133:13133","55679:55679"]
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+      - "13133:13133"
+      - "55679:55679"
     restart: unless-stopped
     networks: [obs-net]

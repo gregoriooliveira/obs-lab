@@ -1,0 +1,83 @@
+# inventory-db - Postgres 16 com pg_stat_statements pra DBM
+# (Splunk Database Query Performance + AppD Database Monitoring)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: inventory-data
+  namespace: obs-lab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-db
+  namespace: obs-lab
+  labels: { app: inventory-db }
+spec:
+  selector: { app: inventory-db }
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      nodePort: 30432
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-db
+  namespace: obs-lab
+  labels: { app: inventory-db }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }     # PVC RWO: nao pode ter 2 pods no mesmo volume
+  selector:
+    matchLabels: { app: inventory-db }
+  template:
+    metadata:
+      labels: { app: inventory-db }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          # pg_stat_statements precisa de preload no start do servidor
+          args:
+            - postgres
+            - -c
+            - shared_preload_libraries=pg_stat_statements
+            - -c
+            - pg_stat_statements.track=all
+            - -c
+            - pg_stat_statements.max=10000
+          ports:
+            - { name: postgres, containerPort: 5432 }
+          env:
+            - { name: POSTGRES_USER,     valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_USER } } }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_PASSWORD } } }
+            - { name: POSTGRES_DB,       valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_NAME } } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          volumeMounts:
+            - { name: data,    mountPath: /var/lib/postgresql/data }
+            - { name: initdb,  mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { memory: 512Mi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: inventory-data }
+        - name: initdb
+          configMap: { name: db-init }

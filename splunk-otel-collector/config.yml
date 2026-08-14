@@ -1,3 +1,8 @@
+# Config customizado obs-lab
+# Metricas: host_metrics (Navigator) + docker_stats (container) + otlp (app)
+# Traces:   otlp -> Splunk Observability (APM)
+# Logs:     filelog (stdout dos containers) -> Splunk Core via HEC
+
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
@@ -12,88 +17,145 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # No distro Splunk o nome canonico e "host_metrics" ("hostmetrics" e alias
+  # deprecado). root_path aponta pro /hostfs montado, senao le o /proc do
+  # proprio container.
   host_metrics:
+    collection_interval: 10s
     root_path: /hostfs
-    collection_interval: 15s
     scrapers:
       cpu:
       disk:
       filesystem:
+        # Docker Desktop/WSL2 expoe mounts virtuais que nao existem dentro do
+        # container -> scraper falhava a cada 10s. Excluidos aqui.
         exclude_mount_points:
-          mount_points:
-            - ^/parent-distro.*
-            - ^/mnt/host/(wsl|wslg).*
-            - ^/mnt/docker-desktop.*
-            - ^/run/desktop.*
-            - ^/tmp/docker-desktop.*
           match_type: regexp
-      load:
+          mount_points:
+            - .*/parent-distro.*
+            - .*/mnt/host/.*
+            - .*/mnt/docker-desktop.*
+            - .*/run/desktop/.*
+            - .*docker-desktop.*
+        exclude_fs_types:
+          match_type: strict
+          fs_types: [autofs, binfmt_misc, bpf, cgroup, cgroup2, configfs, debugfs,
+                     devpts, devtmpfs, fusectl, hugetlbfs, mqueue, nsfs, overlay,
+                     proc, procfs, pstore, rpc_pipefs, securityfs, selinuxfs,
+                     squashfs, sysfs, tracefs, 9p]
       memory:
       network:
+      load:
       paging:
 
   docker_stats:
     endpoint: unix:///var/run/docker.sock
-    collection_interval: 15s
-    timeout: 5s
+    collection_interval: 10s
+    timeout: 20s
+    metrics:
+      container.cpu.usage.total:
+        enabled: true
+      container.cpu.utilization:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.memory.percent:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+      container.blockio.io_service_bytes_recursive:
+        enabled: true
+
+  # postgresql - metricas + Database Monitoring (DBM) do inventory-db
+  postgresql:
+    endpoint: "inventory-db:5432"
+    username: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    databases:
+      - "${DB_NAME}"
+    collection_interval: 10s
+    tls:
+      insecure: true
+    # DBM - habilita Database Query Performance (top SQL, query samples)
+    events:
+      db.server.query_sample:
+        enabled: true
+      db.server.top_query:
+        enabled: true
+
+  # Logs (filelog -> Splunk Core via HEC) ficam em config-hec.yml, carregado
+  # como segundo --config quando SPLUNK_HEC_URL/TOKEN estiverem preenchidos.
+  # Ver: make splunk-hec
 
 processors:
   memory_limiter:
     check_interval: 2s
     limit_mib: 512
-    spike_limit_mib: 128
 
   batch:
     timeout: 5s
-    send_batch_size: 512
+
+  resourcedetection:
+    detectors: [system]
+    override: true
 
   resource:
     attributes:
       - key: deployment.environment
-        value: "${env:ENVIRONMENT}"
+        value: "${ENVIRONMENT}"
         action: upsert
-      - key: sf.environment
-        value: "${env:ENVIRONMENT}"
-        action: upsert
-
-  resource_detection:
-    detectors: [system]
-    timeout: 5s
-    override: false
 
 exporters:
-  debug:
-    verbosity: normal
-
-  otlp_http/splunk:
-    traces_endpoint: "https://ingest.${env:SPLUNK_REALM}.signalfx.com/v2/trace/otlp"
-    headers:
-      X-SF-Token: "${env:SPLUNK_ACCESS_TOKEN}"
-
+  # Metricas + host metadata -> Splunk Observability
   signalfx:
-    access_token: "${env:SPLUNK_ACCESS_TOKEN}"
-    realm: "${env:SPLUNK_REALM}"
+    access_token: "${SPLUNK_ACCESS_TOKEN}"
+    realm: "${SPLUNK_REALM}"
     sync_host_metadata: true
+
+  # Traces -> Splunk Observability (APM)
+  otlp_http/splunk:
+    traces_endpoint: "https://ingest.${SPLUNK_REALM}.signalfx.com/v2/trace/otlp"
+    headers:
+      X-SF-Token: "${SPLUNK_ACCESS_TOKEN}"
+
+  # DBM events -> Splunk Observability (Database Query Performance)
+  otlp_http/dbmon:
+    logs_endpoint: "https://ingest.${SPLUNK_REALM}.signalfx.com/v3/event"
+    headers:
+      X-SF-Token: "${SPLUNK_ACCESS_TOKEN}"
+      X-splunk-instrumentation-library: "dbmon"
+    sending_queue:
+      batch:
+        flush_timeout: 15s
+        max_size: 10485760
+        sizer: bytes
 
 service:
   extensions: [health_check, zpages]
-
   pipelines:
     traces:
       receivers:  [otlp]
-      processors: [memory_limiter, resource, batch]
-      exporters:  [debug, otlp_http/splunk]
-
-    metrics/app:
-      receivers:  [otlp]
-      processors: [memory_limiter, resource, batch]
-      exporters:  [debug, signalfx]
-
-    metrics/infra:
-      receivers:  [host_metrics, docker_stats]
-      processors: [memory_limiter, resource_detection, batch]
+      processors: [memory_limiter, batch, resourcedetection, resource]
+      exporters:  [otlp_http/splunk]
+    metrics:
+      receivers:  [host_metrics, docker_stats, postgresql, otlp]
+      processors: [memory_limiter, batch, resourcedetection, resource]
       exporters:  [signalfx]
-
+    logs/dbmon:
+      receivers:  [postgresql]
+      processors: [memory_limiter, batch, resourcedetection, resource]
+      exporters:  [otlp_http/dbmon]
   telemetry:
     logs:
       level: info
+    metrics:
+      # Collector >= v0.123 nao expoe mais :8888 por padrao. Reader explicito
+      # para manter http://localhost:8888/metrics (usado no make status).
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888

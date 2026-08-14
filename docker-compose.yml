@@ -19,6 +19,36 @@ services:
       obs-net:
         ipv4_address: 172.20.0.10
 
+  inventory-db:
+    image: postgres:16-alpine
+    container_name: obs-inventory-db
+    # pg_stat_statements: exigido pelo Database Query Performance (top query)
+    # do OTel postgresql receiver. Precisa de preload no start do servidor.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "pg_stat_statements.track=all"
+      - "-c"
+      - "pg_stat_statements.max=10000"
+    environment:
+      POSTGRES_USER: "${DB_USER:-obslab}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-obslab}"
+      POSTGRES_DB: "${DB_NAME:-inventory}"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+      - inventory-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-obslab} -d ${DB_NAME:-inventory}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks: [obs-net]
+
   orders-service:
     build: { context: ./services/orders }
     container_name: obs-orders
@@ -30,6 +60,14 @@ services:
       PAYMENT_URL: http://payment-service:8082
       ERROR_RATE: "${ERROR_RATE:-0.06}"
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+      DB_HOST: inventory-db
+      DB_PORT: "5432"
+      DB_USER: "${DB_USER:-obslab}"
+      DB_PASSWORD: "${DB_PASSWORD:-obslab}"
+      DB_NAME: "${DB_NAME:-inventory}"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
     restart: unless-stopped
     networks: [obs-net]
 
@@ -64,3 +102,6 @@ networks:
     ipam:
       config:
         - subnet: 172.20.0.0/16
+
+volumes:
+  inventory-data:

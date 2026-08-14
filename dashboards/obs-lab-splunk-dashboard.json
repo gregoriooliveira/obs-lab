@@ -1,0 +1,626 @@
+{
+  "data": {
+    "self": "export:/2026-06-15T16:25:00.000000000Z",
+    "type": "https://schema.splunkdev.com/dashify/v1/Export",
+    "main": "https://app.us1.signalfx.com/v2/template/HK38vIS2sx",
+    "content": [
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK38vIS2sx"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3TUEDYxO"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK38sjO1r5"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3AZ5hlER"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3p5aDN6z"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3OCAHY7Y"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3eAl0eqb"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3QgbxnXw"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3qHEYZ58"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3hloToni"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3UoYMkgO"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3NZOwYsR"
+      },
+      {
+        "document": "https://app.us1.signalfx.com/v2/template/HK3wRtDJe0"
+      }
+    ],
+    "version": "1.0.0",
+    "metadata": {
+      "exportedAt": "2026-06-15T16:25:00.000000000Z"
+    }
+  },
+  "includes": [
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [
+        "/v2/directory/~templates/HK38vIS2sx",
+        "/v2/directory/~users/gregorio.oliveira%40teletex.com.br",
+        "/v2/directory/~users/gregorio.oliveira%40teletex.com.br/~recents"
+      ],
+      "id": "HK38vIS2sx",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK38vIS2sx",
+      "signalview": null,
+      "spec": {
+        "<Dashboard>": [
+          {
+            "<Section>": []
+          },
+          {
+            "<$import.chart1>": []
+          },
+          {
+            "<$import.chart2>": []
+          },
+          {
+            "<$import.chart3>": []
+          },
+          {
+            "<$import.chart4>": []
+          },
+          {
+            "<Section>": []
+          },
+          {
+            "<$import.chart5>": []
+          },
+          {
+            "<$import.chart6>": []
+          },
+          {
+            "<$import.chart7>": []
+          },
+          {
+            "<$import.chart8>": []
+          },
+          {
+            "<$import.chart9>": []
+          },
+          {
+            "<$import.chart10>": []
+          },
+          {
+            "<Section>": []
+          },
+          {
+            "<$import.chart11>": []
+          },
+          {
+            "<$import.chart12>": []
+          }
+        ],
+        "$import:chart1": "/v2/template/HK3TUEDYxO",
+        "layout": {
+          "saved": {
+            "_": {
+              "items": [
+                {
+                  "id": "_.0",
+                  "h": 20
+                },
+                {
+                  "id": "_.1",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.2",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.3",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.4",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.5",
+                  "h": 20
+                },
+                {
+                  "id": "_.6",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.7",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.8",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.9",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.10",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.11",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.12",
+                  "h": 20
+                },
+                {
+                  "id": "_.13",
+                  "h": 26,
+                  "w": "1/2"
+                },
+                {
+                  "id": "_.14",
+                  "h": 26,
+                  "w": "1/2"
+                }
+              ]
+            },
+            "_.0": {
+              "parent": "_",
+              "section": {
+                "title": "NEGÓCIO"
+              }
+            },
+            "_.5": {
+              "parent": "_",
+              "section": {
+                "title": "APLICAÇÃO"
+              }
+            },
+            "_.12": {
+              "parent": "_",
+              "section": {
+                "title": "INFRAESTRUTURA"
+              }
+            }
+          }
+        },
+        "$import:chart2": "/v2/template/HK38sjO1r5",
+        "$import:chart3": "/v2/template/HK3AZ5hlER",
+        "$import:chart4": "/v2/template/HK3p5aDN6z",
+        "$import:chart5": "/v2/template/HK3OCAHY7Y",
+        "$import:chart6": "/v2/template/HK3eAl0eqb",
+        "$import:chart7": "/v2/template/HK3QgbxnXw",
+        "$import:chart8": "/v2/template/HK3qHEYZ58",
+        "$import:chart9": "/v2/template/HK3hloToni",
+        "$import:chart10": "/v2/template/HK3UoYMkgO",
+        "$import:chart11": "/v2/template/HK3NZOwYsR",
+        "$import:chart12": "/v2/template/HK3wRtDJe0"
+      },
+      "title": "obs-lab - Cadeia de Microservicos",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3TUEDYxO",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3TUEDYxO",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Receita por método (USD/s)"
+            },
+            "datasource": {
+              "program": "data('payment.revenue.total', rollup='rate').sum(by=['method']).publish(label='USD/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Receita por método (USD/s)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK38sjO1r5",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK38sjO1r5",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:SingleValue>": [],
+            "chart": {},
+            "widget": {
+              "title": "Taxa de aprovação de pagamentos %"
+            },
+            "datasource": {
+              "program": "OK = data('payment.processed.total', rollup='rate').sum()\nFAIL = data('payment.failed.total', rollup='rate').sum()\n((OK / (OK + FAIL)) * 100).publish(label='aprovacao')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Taxa de aprovação de pagamentos %",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3AZ5hlER",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3AZ5hlER",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:SingleValue>": [],
+            "chart": {},
+            "widget": {
+              "title": "Pedidos criados/s"
+            },
+            "datasource": {
+              "program": "data('orders.created.total', rollup='rate').sum().publish(label='pedidos/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Pedidos criados/s",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3p5aDN6z",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3p5aDN6z",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Pagamentos aprovados vs recusados"
+            },
+            "datasource": {
+              "program": "data('payment.processed.total', rollup='rate').sum(by=['method']).publish(label='aprovados/s')\ndata('payment.failed.total', rollup='rate').sum(by=['reason']).publish(label='recusados/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Pagamentos aprovados vs recusados",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3OCAHY7Y",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3OCAHY7Y",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Requests/s (gateway)"
+            },
+            "datasource": {
+              "program": "data('http.requests.total', rollup='rate').sum(by=['route']).publish(label='req/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Requests/s (gateway)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3eAl0eqb",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3eAl0eqb",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Erros 5xx (gateway)"
+            },
+            "datasource": {
+              "program": "data('http.errors.total', rollup='rate').sum(by=['route']).publish(label='erros/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Erros 5xx (gateway)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3QgbxnXw",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3QgbxnXw",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Latência média gateway (ms)"
+            },
+            "datasource": {
+              "program": "S = data('http.request.duration_sum', rollup='rate').sum()\nC = data('http.request.duration_count', rollup='rate').sum()\n(S / C).publish(label='ms medio')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Latência média gateway (ms)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3qHEYZ58",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3qHEYZ58",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Latência máx gateway (ms)"
+            },
+            "datasource": {
+              "program": "data('http.request.duration_max', rollup='max').max().publish(label='ms max')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Latência máx gateway (ms)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3hloToni",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3hloToni",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Pedidos criados vs falhados"
+            },
+            "datasource": {
+              "program": "data('orders.created.total', rollup='rate').sum().publish(label='criados/s')\ndata('orders.failed.total', rollup='rate').sum(by=['reason']).publish(label='falhas/s')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Pedidos criados vs falhados",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3UoYMkgO",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3UoYMkgO",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Latência média DB orders (ms)"
+            },
+            "datasource": {
+              "program": "S = data('orders.db.duration_sum', rollup='rate').sum()\nC = data('orders.db.duration_count', rollup='rate').sum()\n(S / C).publish(label='ms medio')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Latência média DB orders (ms)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3NZOwYsR",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3NZOwYsR",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "CPU por container"
+            },
+            "datasource": {
+              "program": "data('container.cpu.usage.total', rollup='rate').mean(by=['container.name']).publish(label='CPU')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "CPU por container",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    },
+    {
+      "createdAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "createdBy": "/v2/user/G9_HRFjA4AA",
+      "directoryEntries": [],
+      "id": "HK3wRtDJe0",
+      "metadata": null,
+      "self": "https://app.us1.signalfx.com/v2/template/HK3wRtDJe0",
+      "signalview": null,
+      "spec": {
+        "<Chart>": [
+          {
+            "<o11y:TimeSeriesChart>": [],
+            "chart": {},
+            "widget": {
+              "title": "Memória por container (bytes)"
+            },
+            "datasource": {
+              "program": "data('container.memory.usage.total', rollup='average').mean(by=['container.name']).publish(label='Mem')",
+              "time": {
+                "range": 3600000,
+                "rangeEnd": 0,
+                "type": "relative"
+              },
+              "preferredEditor": "text"
+            }
+          }
+        ]
+      },
+      "title": "Memória por container (bytes)",
+      "type": "https://schema.splunkdev.com/dashify/v1/templates/Record",
+      "updatedAt": "2026-06-15T16:25:00.000Z[UTC]",
+      "updatedBy": "/v2/user/G9_HRFjA4AA"
+    }
+  ]
+}
