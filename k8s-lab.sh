@@ -26,14 +26,16 @@ CTX="kind-${CLUSTER}"
 NS=obs-lab
 
 # ── .env ─────────────────────────────────────────────────────────────────────
-if [[ ! -f .env ]]; then
+# `help` funciona sem .env; todo o resto precisa.
+if [[ -f .env ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source ./.env
+  set +a
+elif [[ "${1:-help}" != "help" ]]; then
   echo "  ✗ .env nao encontrado - copie .env.example para .env e preencha" >&2
   exit 1
 fi
-set -a
-# shellcheck disable=SC1091
-source ./.env
-set +a
 
 LAB_PROFILE="${LAB_PROFILE:-full}"
 case "$LAB_PROFILE" in
@@ -46,7 +48,9 @@ APPD_INFRAVIZ="${APPD_INFRAVIZ_OVERRIDE:-$APPD_INFRAVIZ}"
 DEPLOY_TE="${DEPLOY_TE_OVERRIDE:-$DEPLOY_TE}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "  ✗ $1 nao encontrado no PATH. Rode ./bootstrap.sh" >&2; exit 1; }; }
-for c in docker kubectl kind helm; do need "$c"; done
+if [[ "${1:-help}" != "help" ]]; then
+  for c in docker kubectl kind helm; do need "$c"; done
+fi
 
 require_var() {
   local n=$1
