@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Hook anti-vazamento. Instale com: ./scripts/install-hooks.sh
+set -euo pipefail
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[[ -z "$staged" ]] && exit 0
+
+# 1. Arquivos que nunca podem ser versionados
+while IFS= read -r f; do
+  case "$f" in
+    .env|.env.*|*.env|*.pem|*.key|*.p12|*.pfx|*.jks|kubeconfig*)
+      [[ "$f" == ".env.example" ]] && continue
+      echo "  x arquivo de segredo staged: $f"; fail=1 ;;
+  esac
+done <<< "$staged"
+
+# 2. Valores literais em variaveis sensiveis (ignora ${VAR}, env: e placeholders)
+pattern='(ACCESS_TOKEN|ACCOUNT_TOKEN|ACCESS_KEY|HEC_TOKEN|TUNNEL_TOKEN|API_?KEY|SECRET|PASSWORD|PASSWD)[[:space:]]*[:=][[:space:]]*"?[A-Za-z0-9_/+-]{8,}'
+while IFS= read -r f; do
+  [[ "$f" == ".env.example" || "$f" == "scripts/pre-commit" ]] && continue
+  [[ -f "$f" ]] || continue
+  hits=$(grep -nEI "$pattern" "$f" 2>/dev/null \
+    | grep -vE '\$\{|\$env:|\$\(|process\.env|valueFrom|secretKeyRef|from-literal|seu_|sua_|troque_|SET_VIA|PLACEHOLDER|:\?' || true)
+  if [[ -n "$hits" ]]; then
+    echo "  x possivel segredo literal em $f:"; echo "$hits" | sed 's/^/      /'; fail=1
+  fi
+done <<< "$staged"
+
+if [[ $fail -eq 1 ]]; then
+  echo
+  echo "  Commit bloqueado. Use variaveis de ambiente / .env (nao versionado)."
+  echo "  Se for falso positivo: git commit --no-verify"
+  exit 1
+fi

@@ -4,7 +4,7 @@
 # APOS subir: configurar o Database Collector na UI do Controller
 #   Databases > Configure > Add > PostgreSQL
 #     Hostname: inventory-db   Port: 5432
-#     Database: inventory      User/Pass: obslab/obslab
+#     Database: inventory      User/Pass: DB_USER / DB_PASSWORD do .env
 #   (o agent abaixo so executa; o alvo e definido no Controller)
 
 services:

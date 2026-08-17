@@ -34,7 +34,7 @@ services:
       - "pg_stat_statements.max=10000"
     environment:
       POSTGRES_USER: "${DB_USER:-obslab}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD:-obslab}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
       POSTGRES_DB: "${DB_NAME:-inventory}"
     volumes:
       - ./db/init:/docker-entrypoint-initdb.d:ro
@@ -63,7 +63,7 @@ services:
       DB_HOST: inventory-db
       DB_PORT: "5432"
       DB_USER: "${DB_USER:-obslab}"
-      DB_PASSWORD: "${DB_PASSWORD:-obslab}"
+      DB_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
       DB_NAME: "${DB_NAME:-inventory}"
     depends_on:
       inventory-db:

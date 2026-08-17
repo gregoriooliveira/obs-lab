@@ -63,8 +63,9 @@ clusterReceiver:
     receivers:
       postgresql:
         endpoint: "inventory-db.obs-lab.svc.cluster.local:5432"
-        username: obslab
-        password: obslab
+        # Nao versionar credenciais: os valores reais vem do .env via --set.
+        username: SET_VIA_HELM_SET
+        password: SET_VIA_HELM_SET
         databases: [inventory]
         collection_interval: 10s
         tls:

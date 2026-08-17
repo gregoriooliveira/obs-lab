@@ -1,4 +1,4 @@
-.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status
+.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status hooks secrets-scan
 
 BASE    := docker compose -f docker-compose.yml
 SPLUNK  := $(BASE) -f docker-compose.splunk.yml
@@ -30,6 +30,8 @@ help:
 	@echo "    status     Health check all endpoints"
 	@echo "    rebuild    Rebuild images and restart"
 	@echo "    clean      Stop everything and remove volumes"
+	@echo "    hooks      Install anti-secret-leak git pre-commit hook"
+	@echo "    secrets-scan  Scan tracked files + history for secrets"
 	@echo ""
 
 ## Base stack only (debug/stdout output)
@@ -129,3 +131,11 @@ _check-te:
 _check-tunnel:
 	@set -a; . ./.env; set +a; test -n "$$CLOUDFLARE_TUNNEL_TOKEN" || \
 		(echo "  ✗ CLOUDFLARE_TUNNEL_TOKEN not set in .env" && exit 1)
+
+# ── Seguranca / segredos ─────────────────────────────────────────────────────
+hooks:
+	@bash scripts/install-hooks.sh
+
+## Varre arquivos versionados E todo o historico do git
+secrets-scan:
+	@bash scripts/secrets-scan.sh

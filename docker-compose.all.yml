@@ -60,7 +60,7 @@ services:
       SPLUNK_HEC_TOKEN:        "${SPLUNK_HEC_TOKEN}"
       SPLUNK_HEC_INDEX:        "${SPLUNK_HEC_INDEX:-main}"
       DB_USER:                 "${DB_USER:-obslab}"
-      DB_PASSWORD:             "${DB_PASSWORD:-obslab}"
+      DB_PASSWORD:             "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
       DB_NAME:                 "${DB_NAME:-inventory}"
     volumes:
       - ./splunk-otel-collector/config.yml:/etc/otel/collector/custom_config.yaml:ro

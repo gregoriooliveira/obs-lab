@@ -84,7 +84,7 @@ apply_secrets() {
 
   kubectl --context "$CTX" -n "$NS" create secret generic obs-lab-db \
     --from-literal=DB_USER="${DB_USER:-obslab}" \
-    --from-literal=DB_PASSWORD="${DB_PASSWORD:-obslab}" \
+    --from-literal=DB_PASSWORD="${DB_PASSWORD:?defina DB_PASSWORD no .env}" \
     --from-literal=DB_NAME="${DB_NAME:-inventory}" \
     --dry-run=client -o yaml | kubectl --context "$CTX" apply -f - >/dev/null
 
@@ -131,7 +131,7 @@ deploy_splunk() {
     --set "splunkObservability.accessToken=${SPLUNK_ACCESS_TOKEN}" \
     --set "splunkObservability.realm=${SPLUNK_REALM:-us0}" \
     --set "clusterReceiver.config.receivers.postgresql.username=${DB_USER:-obslab}" \
-    --set "clusterReceiver.config.receivers.postgresql.password=${DB_PASSWORD:-obslab}" \
+    --set "clusterReceiver.config.receivers.postgresql.password=${DB_PASSWORD:?defina DB_PASSWORD no .env}" \
     --set "clusterReceiver.config.receivers.postgresql.databases[0]=${DB_NAME:-inventory}" \
     --wait --timeout 10m
   kubectl --context "$CTX" -n splunk-otel get pods

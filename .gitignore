@@ -1,4 +1,19 @@
+# ── Segredos: nada de credencial no repo ─────────────────────────────────────
 .env
+.env.*
+!.env.example
+*.env
 *.env.local
+secrets.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+kubeconfig
+kubeconfig.*
+.helm-values-local.*
+
+# ── Build / runtime ──────────────────────────────────────────────────────────
 node_modules/
 npm-debug.log*

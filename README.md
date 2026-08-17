@@ -37,6 +37,25 @@ make status         # modo A
 
 ---
 
+## Segredos
+
+Nenhuma credencial mora no repositório. Todas vêm do `.env`, que está no
+`.gitignore` e nunca deve ser commitado. `.env.example` só tem placeholders.
+
+```bash
+make hooks          # instala pre-commit que bloqueia .env / segredo literal
+make secrets-scan   # varre arquivos versionados e todo o histórico do git
+```
+
+Regras:
+
+- Segredo novo entra como variável no `.env` + `.env.example` com placeholder.
+- Nos compose/manifests use `${VAR}` ou `secretKeyRef` — nunca o valor.
+- `DB_PASSWORD` é obrigatório (sem default): o compose falha se não estiver no `.env`.
+- Se um token vazar, **rotacione no vendor primeiro**, depois limpe o histórico.
+
+---
+
 ## Os dois modos
 
 | | **A. docker-compose** | **B. Kubernetes (kind)** |
