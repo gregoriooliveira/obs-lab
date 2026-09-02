@@ -10,5 +10,7 @@
 \connect postgres
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
-\connect inventory
+-- o database de negocio vem do .env (DB_NAME), nao e fixo em "inventory"
+\set dbname `echo "${POSTGRES_DB:-inventory}"`
+\connect :"dbname"
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;

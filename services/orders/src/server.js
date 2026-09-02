@@ -39,6 +39,20 @@ const pool = new Pool({
 
 pool.on('error', (err) => console.error('[pg] pool error:', err.message));
 
+// ── Reposicao de estoque ──────────────────────────────────────────────────
+// O lab roda 24/7: sem repor, o estoque semeado zera em minutos e TODO checkout
+// passa a falhar com 409 permanente. A falha de estoque que interessa e a
+// aleatoria (ERROR_RATE), nao o fim do inventario.
+const RESTOCK_EVERY_S = parseInt(process.env.RESTOCK_INTERVAL_S || '60', 10);
+const RESTOCK_BELOW   = parseInt(process.env.RESTOCK_BELOW || '50', 10);
+const RESTOCK_TO      = parseInt(process.env.RESTOCK_TO || '500', 10);
+setInterval(async () => {
+  try {
+    const r = await pool.query('UPDATE products SET stock = $1 WHERE stock < $2', [RESTOCK_TO, RESTOCK_BELOW]);
+    if (r.rowCount) console.log(`[orders-service] restock: ${r.rowCount} produto(s) -> ${RESTOCK_TO}`);
+  } catch (e) { /* db fora do ar: tenta de novo no proximo ciclo */ }
+}, RESTOCK_EVERY_S * 1000);
+
 app.use(express.json());
 app.get('/health', async (req, res) => {
   try {
@@ -154,7 +168,9 @@ async function persistOrder(orderId, customerId, amount, status, paymentId, item
 
 app.post('/orders', async (req, res) => {
   await tracer.startActiveSpan('order.create', async (span) => {
-    const orderId = `ORD-${Date.now()}`;
+    // sufixo aleatorio: com 2 replicas dois pedidos caem no mesmo milissegundo
+    // e o INSERT colide na PK (o pedido some do banco)
+    const orderId = `ORD-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const { items = [], customerId = 'guest', paymentMethod = 'card' } = req.body;
     const amount = items.reduce((s, i) => s + (i.price || 0) * (i.qty || 1), 0) || rand(20, 350);
 

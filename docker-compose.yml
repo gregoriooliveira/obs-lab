@@ -2,10 +2,16 @@
 # gateway (8080) -> orders (8081) -> payment (8082)
 # gateway com IP fixo 172.20.0.10 para testes externos (ThousandEyes API test)
 
+# Nome do projeto FIXO: sem isso o compose usa o nome do diretorio e as imagens
+# saem como <dir>-gateway-service. O k8s-lab.sh/.ps1 faz `kind load
+# obs-lab-gateway-service:latest` e quebraria em qualquer pasta com outro nome.
+name: obs-lab
+
 services:
 
   gateway-service:
     build: { context: ./services/gateway }
+    image: obs-lab-gateway-service:latest
     container_name: obs-gateway
     ports:
       - "8080:8080"
@@ -14,6 +20,15 @@ services:
       OTEL_SERVICE_NAME: gateway-service
       ORDERS_URL: http://orders-service:8081
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+      # auth + auditoria de fraude (users / security_events) vivem no Postgres
+      DB_HOST: inventory-db
+      DB_PORT: "5432"
+      DB_USER: "${DB_USER:-obslab}"
+      DB_PASSWORD: "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
+      DB_NAME: "${DB_NAME:-inventory}"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       obs-net:
@@ -51,6 +66,7 @@ services:
 
   orders-service:
     build: { context: ./services/orders }
+    image: obs-lab-orders-service:latest
     container_name: obs-orders
     ports:
       - "8081:8081"
@@ -73,6 +89,7 @@ services:
 
   payment-service:
     build: { context: ./services/payment }
+    image: obs-lab-payment-service:latest
     container_name: obs-payment
     ports:
       - "8082:8082"
@@ -86,12 +103,14 @@ services:
 
   load-gen:
     build: { context: ./load-gen }
+    image: obs-lab-load-gen:latest
     container_name: obs-load-gen
     environment:
       TARGET_URL: "http://gateway-service:8080"
       VIRTUAL_USERS: "${LOAD_VUS:-8}"
       THINK_TIME_MS: "${THINK_TIME_MS:-400}"
       STATS_INTERVAL_S: "${STATS_INTERVAL_S:-30}"
+      FRAUD_ENABLED: "${FRAUD_ENABLED:-true}"
     depends_on: [gateway-service]
     restart: unless-stopped
     networks: [obs-net]

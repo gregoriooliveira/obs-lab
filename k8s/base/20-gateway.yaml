@@ -44,6 +44,12 @@ spec:
             - { name: OTEL_SERVICE_NAME,  value: gateway-service }
             - { name: ORDERS_URL,         value: http://orders-service:8081 }
             - { name: LATENCY_JITTER_MS,  value: "150" }
+            # ── DB: auth (users) + auditoria de fraude (security_events) ──
+            - { name: DB_HOST, value: inventory-db }
+            - { name: DB_PORT, value: "5432" }
+            - { name: DB_USER,     valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_USER } } }
+            - { name: DB_PASSWORD, valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_PASSWORD } } }
+            - { name: DB_NAME,     valueFrom: { secretKeyRef: { name: obs-lab-db, key: DB_NAME } } }
             # ── Splunk: OTLP no agent DaemonSet, que escuta no IP do no ──
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://$(NODE_IP):4318" }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }

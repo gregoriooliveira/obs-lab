@@ -158,25 +158,45 @@ function Deploy-App {
 function Deploy-Splunk {
     $e = Get-DotEnv
     if (-not $e['SPLUNK_ACCESS_TOKEN']) { Write-Error 'SPLUNK_ACCESS_TOKEN nao definido no .env' }
+    $realm = if ($e['SPLUNK_REALM']) { $e['SPLUNK_REALM'] } else { 'us0' }
     & helm repo add splunk-otel-collector-chart https://signalfx.github.io/splunk-otel-collector-chart 2>&1 | Out-Null
     Invoke-Checked 'helm' @('repo','update') 'helm repo update'
-    Invoke-Checked 'helm' @(
+
+    # Logs de container (inclui os eventos JSON de fraude do gateway) so tem
+    # destino se o HEC do Splunk Core estiver preenchido - mesma regra do modo A.
+    $hec = @()
+    if ($e['SPLUNK_HEC_URL'] -and $e['SPLUNK_HEC_TOKEN']) {
+        $idx = if ($e['SPLUNK_HEC_INDEX']) { $e['SPLUNK_HEC_INDEX'] } else { 'main' }
+        $hec = @(
+            '--set',"splunkPlatform.endpoint=$($e['SPLUNK_HEC_URL'])",
+            '--set',"splunkPlatform.token=$($e['SPLUNK_HEC_TOKEN'])",
+            '--set',"splunkPlatform.index=$idx",
+            '--set','splunkPlatform.logsEnabled=true',
+            '--set','splunkPlatform.insecureSkipVerify=true'
+        )
+        Write-Host '--- logs de container -> Splunk Core (HEC) ---' -ForegroundColor Cyan
+    } else {
+        Write-Host '--- SPLUNK_HEC_* vazio: logs de container ficam so no kubectl logs ---' -ForegroundColor Yellow
+    }
+
+    Invoke-Checked 'helm' (@(
         'upgrade','--install','splunk-otel-collector',
         'splunk-otel-collector-chart/splunk-otel-collector',
         '--kube-context',$CTX,
         '--namespace','splunk-otel','--create-namespace',
         '-f','k8s/splunk/values.yaml',
         '--set',"splunkObservability.accessToken=$($e['SPLUNK_ACCESS_TOKEN'])",
-        '--set',"splunkObservability.realm=$($e['SPLUNK_REALM'])",
+        '--set',"splunkObservability.realm=$realm",
         # credenciais do Postgres pro receiver de DBM (nao versionadas)
         '--set',"clusterReceiver.config.receivers.postgresql.username=$($e['DB_USER'])",
         '--set',"clusterReceiver.config.receivers.postgresql.password=$($e['DB_PASSWORD'])",
         '--set',"clusterReceiver.config.receivers.postgresql.databases[0]=$($e['DB_NAME'])",
-        '--wait','--timeout','5m'
-    ) 'helm install splunk-otel-collector'
+        # o endpoint de DBM depende do realm; fixo em us1 no values.yaml mandava
+        # os eventos de query pro realm errado em qualquer conta fora de us1
+        '--set-string',"clusterReceiver.config.exporters.otlp_http/dbmon.logs_endpoint=https://ingest.$realm.observability.splunkcloud.com/v3/event"
+    ) + $hec + @('--wait','--timeout','10m')) 'helm install splunk-otel-collector'
     & kubectl --context $CTX -n splunk-otel get pods
 }
-
 function Deploy-Appd {
     $e = Get-DotEnv
     if (-not $e['APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY']) { Write-Error 'APPDYNAMICS_AGENT_ACCOUNT_ACCESS_KEY nao definido no .env' }

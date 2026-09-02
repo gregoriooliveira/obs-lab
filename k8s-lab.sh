@@ -121,18 +121,38 @@ deploy_app() {
 
 deploy_splunk() {
   require_var SPLUNK_ACCESS_TOKEN
+  local realm="${SPLUNK_REALM:-us0}"
   helm repo add splunk-otel-collector-chart https://signalfx.github.io/splunk-otel-collector-chart >/dev/null 2>&1 || true
   helm repo update >/dev/null
+
+  # Logs de container (inclui os eventos JSON de fraude do gateway) so tem
+  # destino se o HEC do Splunk Core estiver configurado - mesma regra do modo A.
+  local hec=()
+  if [[ -n "${SPLUNK_HEC_URL:-}" && -n "${SPLUNK_HEC_TOKEN:-}" ]]; then
+    hec=(--set "splunkPlatform.endpoint=${SPLUNK_HEC_URL}"
+         --set "splunkPlatform.token=${SPLUNK_HEC_TOKEN}"
+         --set "splunkPlatform.index=${SPLUNK_HEC_INDEX:-main}"
+         --set "splunkPlatform.logsEnabled=true"
+         --set "splunkPlatform.insecureSkipVerify=true")
+    echo "--- logs de container -> Splunk Core (HEC) ---"
+  else
+    echo "--- SPLUNK_HEC_* vazio: logs de container ficam so no kubectl logs ---"
+  fi
+
+  # o endpoint de DBM depende do realm; hardcodar us1 no values.yaml mandava
+  # os eventos de query pro realm errado em qualquer conta fora de us1
   helm upgrade --install splunk-otel-collector \
     splunk-otel-collector-chart/splunk-otel-collector \
     --kube-context "$CTX" \
     --namespace splunk-otel --create-namespace \
     -f k8s/splunk/values.yaml \
     --set "splunkObservability.accessToken=${SPLUNK_ACCESS_TOKEN}" \
-    --set "splunkObservability.realm=${SPLUNK_REALM:-us0}" \
+    --set "splunkObservability.realm=${realm}" \
     --set "clusterReceiver.config.receivers.postgresql.username=${DB_USER:-obslab}" \
     --set "clusterReceiver.config.receivers.postgresql.password=${DB_PASSWORD:?defina DB_PASSWORD no .env}" \
     --set "clusterReceiver.config.receivers.postgresql.databases[0]=${DB_NAME:-inventory}" \
+    --set-string "clusterReceiver.config.exporters.otlp_http/dbmon.logs_endpoint=https://ingest.${realm}.observability.splunkcloud.com/v3/event" \
+    "${hec[@]}" \
     --wait --timeout 10m
   kubectl --context "$CTX" -n splunk-otel get pods
 }

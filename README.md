@@ -186,15 +186,16 @@ POST /api/checkout (gateway)
 | gateway-service | 8080 | Entrada, catálogo, roteamento |
 | orders-service | 8081 | Cria pedido, reserva estoque no Postgres |
 | payment-service | 8082 | Processa pagamento (adquirente simulado) |
-| inventory-db | 5432 | Postgres 16 (`products` / `orders` / `order_items`) |
+| inventory-db | 5432 | Postgres 16 (`products` / `orders` / `order_items` / `users` / `security_events`) |
 
 ### Endpoints (gateway)
 
 | Método | Path | Descrição |
 |---|---|---|
-| GET | `/api/products` | Lista catálogo |
+| GET | `/api/products` | Lista catálogo (6 itens) |
 | GET | `/api/products/:id` | Produto por id |
 | POST | `/api/checkout` | Compra → orders → payment (trace distribuído) |
+| POST | `/api/login` | Autenticação (brute force / account takeover) |
 | GET | `/api/debug/error` | 500 forçado |
 | GET | `/api/debug/slow?ms=N` | Lento |
 | GET | `/health` | Health |
@@ -211,6 +212,57 @@ POST /api/checkout (gateway)
 | Janela de degradação (45s) | payment | a cada 3 minutos |
 | Cache miss | gateway | 15% |
 | 500 forçado | gateway | 10% do tráfego do load-gen |
+| Ataques de fraude | gateway | 10% do tráfego do load-gen |
+
+O estoque é **reposto** a cada 60s (`RESTOCK_*` no orders-service). Sem isso o
+inventário semeado zera em minutos e todo checkout passa a falhar com 409
+permanente — a falha de estoque que interessa é a aleatória, não o fim do lab.
+
+---
+
+## Rotina de fraude
+
+O gateway tem um módulo de segurança (`services/gateway/src/security.js`) e o
+load-gen dedica 10% do tráfego a atacar o próprio lab. Serve para exercitar
+detecção de fraude, correlação log↔trace e alertas de segurança.
+
+| Cenário | Detector | Como o load-gen dispara | Resultado |
+|---|---|---|---|
+| **Bot scraping** | UA de ferramenta (`curl`, `python-requests`, `Scrapy`) ou > 30 req/10s no catálogo | 25 GETs em `/api/products` do IP `203.0.113.66` | risco até 100, **429** acima de 80 |
+| **Price tampering** | preço do item ≠ catálogo | checkout de `prod-003` (129.99) por 1.99, IP `203.0.113.77` | risco 95, **400** sempre |
+| **Card testing** | > 8 tentativas/min **e** valor < $5 | 12 checkouts de `prod-006` (2.99), IP `203.0.113.88` | risco até 100, **429** acima de 85 |
+| **Velocity abuse** | > 10 pedidos/min do mesmo `customerId` | 15 checkouts de `cust-velocity`, IP `203.0.113.99` | risco até 100, **429** acima de 90 |
+| **Brute force** | > 5 tentativas de login/min por IP ou usuário | 8 logins errados em `alice`/`bob`/`admin`, IP `198.51.100.42` | risco até 100, **429** + conta travada |
+| **Account takeover** | login válido de IP diferente do último | login do `bob` de `192.0.2.10`, depois de `203.0.113.200` | risco 75, alerta sem bloqueio |
+
+Usuários demo (senhas fracas de propósito, hash SHA-256 real):
+`alice/alice123`, `bob/hunter2`, `admin/admin`.
+
+O lockout do brute force **expira** em 3 min (`LOCK_TTL_MS`). Sem TTL a conta
+travava para sempre no primeiro ataque e os cenários de login legítimo e de ATO
+paravam de gerar dado.
+
+### Onde o evento aparece
+
+| Sinal | Onde |
+|---|---|
+| Log JSON (`logger=security`, com `threat`, `risk_score`, `blocked`, `client_ip`) | stdout do pod → Splunk Core via HEC (opt-in) e `kubectl logs` |
+| Métrica `security.fraud.total` (labels `threat`, `blocked`) | OTLP → Splunk Observability |
+| Métrica `security.auth.total` (label `username`) | OTLP → Splunk Observability |
+| Atributos no span (`security.threat`, `security.risk_score`, `security.blocked`) | APM — o trace do checkout bloqueado |
+| Tabela `security_events` no Postgres | consulta direta + Database Query Performance |
+
+No modo B os logs de container só saem do cluster se `SPLUNK_HEC_URL` /
+`SPLUNK_HEC_TOKEN` estiverem no `.env` — aí o driver liga `splunkPlatform.*` no
+chart automaticamente. Sem HEC, a métrica, o span e a tabela continuam valendo.
+
+Para desligar a rotina inteira: `FRAUD_ENABLED=false` no `.env`.
+
+**Tráfego legítimo x ataque.** Os detectores são por IP e por `customerId`. O
+load-gen simula 100 usuários legítimos (IPs `198.18.0.x`, `cust-001..100`) e os
+ataques vêm de IPs fixos da faixa de documentação (`203.0.113.x`,
+`198.51.100.x`, `192.0.2.x`) — é o que separa fraude de ruído. Se aumentar muito
+`LOAD_VUS`, aumente também a população de usuários no `load-gen/index.js`.
 
 ---
 
@@ -306,6 +358,7 @@ métricas e traces parariam junto.
 ├── .env.example                  template de credenciais
 │
 ├── services/{gateway,orders,payment}/    apps Node.js + instrumentação
+│     gateway/src/security.js         detectores de fraude + auth
 ├── load-gen/                     gerador de tráfego
 ├── db/init/                      schema + seed + pg_stat_statements
 ├── dashboards/                   dashboard de exemplo do Splunk
@@ -371,6 +424,26 @@ Cada uma custou uma sessão de debug. Estão comentadas no arquivo correspondent
 - Ruído esperado: o receiver tenta dar `EXPLAIN` nas próprias queries que ele vê
   em `pg_stat_activity`; como vêm normalizadas com `$N`, o EXPLAIN falha. Os
   samples continuam sendo exportados — é log, não perda de dado.
+
+**App / rotina de fraude**
+- O `docker compose` nomeia as imagens com o nome do **projeto** (por padrão, o
+  nome da pasta). O `docker-compose.yml` fixa `name: obs-lab` e o `image:` de
+  cada serviço — sem isso o `kind load obs-lab-gateway-service:latest` falha em
+  qualquer diretório que não se chame `obs-lab`.
+- Detector de fraude e gerador de carga precisam ser desenvolvidos juntos: o
+  load-gen mandava preço aleatório no checkout e o detector de `price_tampering`
+  bloqueava **todo** checkout legítimo com 400 — orders e payment ficavam sem
+  tráfego e o trace distribuído morria no gateway.
+- Thresholds por IP com todo o tráfego saindo de um IP só (o pod do load-gen)
+  viram falso positivo garantido. Daí a população de 100 usuários com IP e
+  `customerId` próprios.
+- Ordem dos detectores importa: `card_testing` (por IP) disparava antes do
+  `velocity_abuse` (por cliente) e mascarava o cenário. Card testing agora exige
+  valor < $5, que é o que o define.
+- `blocked` tem que ir **dentro** do evento: é o que alimenta o log JSON e o
+  label da métrica `security.fraud.total`.
+- `ORD-${Date.now()}` colide entre réplicas no mesmo milissegundo e o INSERT
+  perde o pedido — o id leva sufixo aleatório.
 
 **Recursos**
 - Modo A + modo B juntos passam de 13 GB. Em máquina de 16 GB, rode um por vez

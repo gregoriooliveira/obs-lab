@@ -1,4 +1,4 @@
-.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status hooks secrets-scan
+.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status hooks secrets-scan k8s-up k8s-status k8s-down
 
 BASE    := docker compose -f docker-compose.yml
 SPLUNK  := $(BASE) -f docker-compose.splunk.yml
@@ -32,6 +32,11 @@ help:
 	@echo "    clean      Stop everything and remove volumes"
 	@echo "    hooks      Install anti-secret-leak git pre-commit hook"
 	@echo "    secrets-scan  Scan tracked files + history for secrets"
+	@echo ""
+	@echo "  Modo B (Kubernetes/kind) - atalhos pro k8s-lab.sh:"
+	@echo "    k8s-up     Cluster kind + imagens + app + vendors"
+	@echo "    k8s-status Nodes, pods, endpoints, contadores de export"
+	@echo "    k8s-down   Destroi o cluster"
 	@echo ""
 
 ## Base stack only (debug/stdout output)
@@ -131,6 +136,17 @@ _check-te:
 _check-tunnel:
 	@set -a; . ./.env; set +a; test -n "$$CLOUDFLARE_TUNNEL_TOKEN" || \
 		(echo "  ✗ CLOUDFLARE_TUNNEL_TOKEN not set in .env" && exit 1)
+
+# ── Modo B: Kubernetes (kind) ────────────────────────────────────────────────
+# Atalhos pro k8s-lab.sh, pra nao ter dois pontos de entrada na documentacao.
+k8s-up: _check-env
+	@./k8s-lab.sh up
+
+k8s-status:
+	@./k8s-lab.sh status
+
+k8s-down:
+	@./k8s-lab.sh down
 
 # ── Seguranca / segredos ─────────────────────────────────────────────────────
 hooks:

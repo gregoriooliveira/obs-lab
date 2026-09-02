@@ -15,6 +15,7 @@ clusterName: obs-lab-k8s
 environment: lab-k8s
 
 splunkObservability:
+  # placeholder: o driver (k8s-lab.sh/.ps1) sempre sobrescreve com SPLUNK_REALM
   realm: us1
   metricsEnabled: true
   tracesEnabled: true
@@ -23,10 +24,13 @@ splunkObservability:
   infrastructureMonitoringEventsEnabled: true
   profilingEnabled: false
 
-# NOTA: o chart nao tem splunkObservability.logsEnabled. Logs de container so
-# vao pro Splunk Platform (HEC) - configure splunkPlatform.* quando o Splunk
-# Core estiver disponivel. Os EVENTOS do k8s vao pro O11y pelo feature gate
-# abaixo, sem depender do HEC.
+# NOTA: o chart nao tem splunkObservability.logsEnabled. Logs de container -
+# inclusive os eventos JSON de fraude do gateway (logger=security) - so vao pro
+# Splunk Platform (HEC). O driver liga splunkPlatform.* automaticamente quando
+# SPLUNK_HEC_URL/SPLUNK_HEC_TOKEN estao no .env; sem isso os eventos de fraude
+# ficam so no `kubectl logs`, no banco (security_events) e na metrica
+# security.fraud.total. Os EVENTOS do k8s vao pro O11y pelo feature gate abaixo,
+# sem depender do HEC.
 featureGates:
   sendK8sEventsToSplunkO11y: true
 
@@ -80,6 +84,9 @@ clusterReceiver:
             enabled: true
     exporters:
       otlp_http/dbmon:
+        # placeholder: o driver sobrescreve com o realm do .env
+        # (--set-string ...otlp_http/dbmon.logs_endpoint). Fixo em us1 aqui, uma
+        # conta em us0/eu0 mandaria os eventos de query pro realm errado.
         logs_endpoint: "https://ingest.us1.observability.splunkcloud.com/v3/event"
         headers:
           X-SF-Token: "${SPLUNK_OBSERVABILITY_ACCESS_TOKEN}"
