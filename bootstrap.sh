@@ -141,7 +141,11 @@ check_resources() {
   (( cpus   >= 4  )) || { printf '    \033[33m! CPU abaixo do recomendado (4+)\033[0m\n'; warn=1; }
   (( mem_gb >= 16 )) || { printf '    \033[33m! RAM abaixo do recomendado pro perfil full (16 GB+). Use LAB_PROFILE=lite\033[0m\n'; warn=1; }
   (( disk_gb >= 40 )) || { printf '    \033[33m! disco abaixo do recomendado (40 GB+)\033[0m\n'; warn=1; }
-  (( warn == 0 )) && ok "recursos suficientes pro perfil full"
+  # if em vez de `(( )) && ok`: com warn=1 o (( )) retorna 1 e, sendo a
+  # ultima linha da funcao, fazia check_resources retornar 1. Com set -e,
+  # a chamada la embaixo abortava o script antes de instalar nada - ou
+  # seja, todo servidor abaixo do recomendado ficava sem bootstrap.
+  if (( warn == 0 )); then ok "recursos suficientes pro perfil full"; fi
 }
 
 echo ""
