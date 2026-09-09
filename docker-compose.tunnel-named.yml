@@ -1,0 +1,28 @@
+# Cloudflare Tunnel NOMEADO - hostname fixo no seu dominio
+#
+# Alternativa ao Quick Tunnel (docker-compose.tunnel.yml), para quando a URL
+# efemera do trycloudflare.com nao serve - ex: teste do ThousandEyes que nao
+# pode ser reeditado a cada restart do lab.
+#
+# Exige um dominio usando a Cloudflare como DNS autoritativo.
+#
+# SETUP (uma vez, no Cloudflare Zero Trust dashboard):
+#   1. Zero Trust > Networks > Tunnels > Create a tunnel > Cloudflared
+#   2. Nomeie (ex: obs-lab), copie o TOKEN gerado -> .env (CLOUDFLARE_TUNNEL_TOKEN)
+#   3. Em Route tunnel > Published applications, preencha:
+#        Hostname: obs-lab   Domain: seudominio.com   Path: (vazio)
+#        Service:  Type HTTP   URL gateway-service:8080
+#   4. (opcional) mais hostnames para orders/payment se quiser expor
+#
+#   make tunnel-named
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: obs-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
+    restart: unless-stopped
+    networks: [obs-net]
+    depends_on: [gateway-service]

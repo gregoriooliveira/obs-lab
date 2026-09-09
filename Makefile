@@ -1,4 +1,4 @@
-.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel logs ps clean rebuild status hooks secrets-scan k8s-up k8s-status k8s-down
+.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel tunnel-url tunnel-named logs ps clean rebuild status hooks secrets-scan k8s-up k8s-status k8s-down
 
 BASE    := docker compose -f docker-compose.yml
 SPLUNK  := $(BASE) -f docker-compose.splunk.yml
@@ -7,6 +7,7 @@ APPD    := $(BASE) -f docker-compose.appd.yml
 APPDDB  := $(APPD) -f docker-compose.appd-db.yml
 TE      := $(BASE) -f docker-compose.thousandeyes.yml
 TUNNEL  := $(BASE) -f docker-compose.tunnel.yml
+TUNNELN := $(BASE) -f docker-compose.tunnel-named.yml
 ALL     := $(BASE) -f docker-compose.splunk.yml -f docker-compose.appd.yml -f docker-compose.appd-db.yml
 
 ## Default: show help
@@ -24,7 +25,9 @@ help:
 	@echo "    appd-db    AppDynamics APM + Database Agent"
 	@echo "    te         Start ThousandEyes Enterprise Agent"
 	@echo "    all        All vendors (Splunk + AppD APM + AppD DB agent)"
-	@echo "    tunnel     Start Cloudflare tunnel (publish URLs to internet)"
+	@echo "    tunnel     Start Cloudflare Quick Tunnel (free, no domain/token)"
+	@echo "    tunnel-url Print the public *.trycloudflare.com URL"
+	@echo "    tunnel-named  Named tunnel (needs domain + CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo "    logs       Follow logs from all containers"
 	@echo "    ps         Show running containers"
 	@echo "    status     Health check all endpoints"
@@ -79,10 +82,20 @@ all: _check-env _check-splunk _check-appd
 	$(ALL) up -d --build
 	@echo "  ✓ Exporting to Splunk + AppDynamics"
 
-## Cloudflare tunnel (publish to internet)
-tunnel: _check-env _check-tunnel
+## Cloudflare Quick Tunnel (gratis, sem dominio e sem token)
+tunnel: _check-env
 	$(TUNNEL) up -d
-	@echo "  ✓ Cloudflare tunnel ativo – URLs publicadas (veja Public Hostname no Zero Trust)"
+	@echo "  ✓ Quick Tunnel subindo – aguardando a URL publica..."
+	@$(MAKE) --no-print-directory tunnel-url
+
+## Imprime a URL publica do Quick Tunnel (o cloudflared so a anuncia no log)
+tunnel-url:
+	@for i in $$(seq 1 20); do url=$$(docker logs obs-cloudflared 2>&1 | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1); if [ -n "$$url" ]; then echo "  $$url"; exit 0; fi; sleep 1; done; echo "  ✗ URL nao encontrada no log - veja: docker logs obs-cloudflared"; exit 1
+
+## Cloudflare tunnel NOMEADO (hostname fixo; exige dominio na Cloudflare)
+tunnel-named: _check-env _check-tunnel
+	$(TUNNELN) up -d
+	@echo "  ✓ Tunnel nomeado ativo – veja o hostname em Zero Trust > Networks > Tunnels"
 
 ## Follow logs (todos os overlays)
 logs:

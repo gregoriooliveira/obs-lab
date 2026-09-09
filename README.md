@@ -139,7 +139,8 @@ ligar 8h/dia útil corta ~75% da conta. `./k8s-lab.sh down` + desligar a VM ao f
 do dia; `./k8s-lab.sh up` reconstrói tudo em ~5 minutos.
 
 Se quiser expor o lab pra internet (ex: ThousandEyes Cloud Agents testando de fora)
-sem abrir porta no firewall, use o Cloudflare Tunnel — `make tunnel`, veja abaixo.
+sem abrir porta no firewall, use o Cloudflare Quick Tunnel — `make tunnel`. Nao
+precisa de conta, dominio nem token; veja abaixo.
 
 ---
 
@@ -278,7 +279,8 @@ make appd        # + AppDynamics APM
 make appd-db     # + AppD APM e Database Agent
 make te          # + ThousandEyes Enterprise Agent
 make all         # Splunk + AppD APM + AppD DB Agent
-make tunnel      # Cloudflare Tunnel
+make tunnel      # Cloudflare Quick Tunnel (URL publica gratis)
+make tunnel-url  # mostra a URL *.trycloudflare.com
 make status      # health check
 make logs        # follow dos logs
 make clean       # derruba tudo e remove volumes
@@ -315,11 +317,27 @@ O agente se registra sozinho. Crie os testes apontando para:
 - modo A: `http://gateway-service:8080/health` e `/api/products`
 - modo B: `http://gateway-service.obs-lab.svc.cluster.local:8080/health`
 
-**Cloudflare Tunnel** (opcional, pra testar de fora)
-1. Zero Trust → Networks → Tunnels → Create tunnel → Cloudflared
-2. Copie o token → `.env` (`CLOUDFLARE_TUNNEL_TOKEN`)
-3. Public Hostname → serviço `HTTP → gateway-service:8080`
-4. `make tunnel`
+**Cloudflare Quick Tunnel** (opcional, pra testar de fora)
+
+```bash
+make tunnel        # sobe o cloudflared e imprime a URL publica
+make tunnel-url    # reimprime a URL a qualquer momento
+```
+
+Sem conta, sem dominio, sem token. A Cloudflare devolve uma URL efemera em
+`https://<aleatorio>.trycloudflare.com` apontando pro gateway. **A URL muda a
+cada restart do container** — se o teste do ThousandEyes nao puder ser reeditado
+a cada subida do lab, use o tunnel nomeado abaixo.
+
+**Cloudflare Tunnel nomeado** (hostname fixo; exige dominio na Cloudflare)
+1. Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared
+2. Copie o token (a string `eyJ...` do comando de instalacao) → `.env` (`CLOUDFLARE_TUNNEL_TOKEN`)
+3. Route tunnel → Hostname `obs-lab` + seu dominio, Path vazio,
+   Service `HTTP` → `gateway-service:8080`
+4. `make tunnel-named`
+
+O dropdown de Domain so lista dominios que usam a Cloudflare como DNS
+autoritativo — sem isso, o passo 3 nao fecha e o Quick Tunnel e o caminho.
 
 **Splunk Core — logs via HEC** (opcional)
 Settings → Data Inputs → HTTP Event Collector, crie um token, preencha
@@ -369,7 +387,8 @@ métricas e traces parariam junto.
 ├── docker-compose.appd.yml       + AppD APM e Machine Agent
 ├── docker-compose.appd-db.yml    + AppD Database Agent
 ├── docker-compose.thousandeyes.yml
-├── docker-compose.tunnel.yml     + Cloudflare Tunnel
+├── docker-compose.tunnel.yml     + Cloudflare Quick Tunnel (sem dominio)
+├── docker-compose.tunnel-named.yml  + Cloudflare Tunnel nomeado
 ├── splunk-otel-collector/        config.yml e config-hec.yml
 │
 └── k8s/

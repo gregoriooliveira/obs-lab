@@ -1,23 +1,21 @@
-# Cloudflare Tunnel - publica o gateway do lab na internet
+# Cloudflare Quick Tunnel - publica o gateway do lab na internet
 # Permite ThousandEyes Cloud Agents testarem de fora pra dentro (onprem sem abrir porta no firewall)
 #
-# SETUP (uma vez, no Cloudflare Zero Trust dashboard):
-#   1. Zero Trust > Networks > Tunnels > Create a tunnel > Cloudflared
-#   2. Nomeie (ex: obs-lab), copie o TOKEN gerado -> .env (CLOUDFLARE_TUNNEL_TOKEN)
-#   3. Em Public Hostname, aponte um subdominio (ex: obs-lab.seudominio.com)
-#      para o servico: HTTP -> gateway-service:8080
-#   4. (opcional) mais hostnames para orders/payment se quiser expor
+# NAO precisa de conta, dominio, nem token. O cloudflared pede uma URL efemera
+# em *.trycloudflare.com e sobe a conexao de saida (egress) ate a Cloudflare.
 #
-# O tunnel NAO precisa de porta aberta no firewall - o cloudflared cria a
-# conexao de saida (egress) ate a Cloudflare. Ideal para onprem.
+#   make tunnel        sobe o tunnel
+#   make tunnel-url    imprime a URL publica (sai no log do cloudflared)
+#
+# A URL MUDA a cada restart do container. Se precisar de hostname fixo, use o
+# tunnel nomeado (docker-compose.tunnel-named.yml) - esse exige dominio na
+# Cloudflare e token, veja o README.
 
 services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: obs-cloudflared
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: "${CLOUDFLARE_TUNNEL_TOKEN}"
+    command: tunnel --no-autoupdate --url http://gateway-service:8080
     restart: unless-stopped
     networks: [obs-net]
     depends_on: [gateway-service]

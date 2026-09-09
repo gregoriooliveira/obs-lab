@@ -1,12 +1,12 @@
 # obs-lab - equivalente ao Makefile para Windows (sem make instalado)
 #
 #   .\obs-lab.ps1 up | splunk | splunk-hec | appd | appd-db | te | all
-#   .\obs-lab.ps1 tunnel | status | ps | logs | rebuild | clean
+#   .\obs-lab.ps1 tunnel | tunnel-url | tunnel-named | status | ps | logs | rebuild | clean
 
 param(
     [Parameter(Position = 0)]
     [ValidateSet('help','up','splunk','splunk-hec','appd','appd-db','te','all',
-                 'tunnel','status','ps','logs','rebuild','clean')]
+                 'tunnel','tunnel-url','tunnel-named','status','ps','logs','rebuild','clean')]
     [string]$Target = 'help'
 )
 
@@ -27,6 +27,7 @@ $APPD   = $BASE   + @('-f','docker-compose.appd.yml')
 $APPDDB = $APPD   + @('-f','docker-compose.appd-db.yml')
 $TE     = $BASE   + @('-f','docker-compose.thousandeyes.yml')
 $TUNNEL = $BASE   + @('-f','docker-compose.tunnel.yml')
+$TUNNELN= $BASE   + @('-f','docker-compose.tunnel-named.yml')
 $ALL    = $BASE   + @('-f','docker-compose.splunk.yml','-f','docker-compose.appd.yml','-f','docker-compose.appd-db.yml')
 
 function Get-DotEnv {
@@ -64,6 +65,22 @@ function Test-Endpoint([string]$label, [string]$url) {
     }
 }
 
+# O cloudflared so anuncia a URL efemera no proprio log; nao ha API pra consultar.
+function Show-TunnelUrl {
+    for ($i = 0; $i -lt 20; $i++) {
+        # PS 5.1 transforma stderr de exe nativo em ErrorRecord; com
+        # ErrorActionPreference=Stop isso aborta o script. cloudflared
+        # escreve a URL justamente no stderr, entao relaxamos aqui.
+        $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $log = (docker logs obs-cloudflared 2>&1 | Out-String)
+        $ErrorActionPreference = $prev
+        $m = [regex]::Match($log, 'https://[a-z0-9-]+\.trycloudflare\.com')
+        if ($m.Success) { Write-Host "  $($m.Value)"; return }
+        Start-Sleep -Seconds 1
+    }
+    Write-Error 'URL nao encontrada no log - veja: docker logs obs-cloudflared'
+}
+
 switch ($Target) {
     'help' {
         Write-Host ''
@@ -78,7 +95,9 @@ switch ($Target) {
         Write-Host '    appd-db     + AppDynamics APM e Database Agent'
         Write-Host '    te          + ThousandEyes Enterprise Agent'
         Write-Host '    all         Splunk + AppD APM + AppD DB agent'
-        Write-Host '    tunnel      Cloudflare tunnel'
+        Write-Host '    tunnel      Cloudflare Quick Tunnel (gratis, sem dominio)'
+        Write-Host '    tunnel-url  Mostra a URL publica do Quick Tunnel'
+        Write-Host '    tunnel-named  Tunnel nomeado (exige dominio + token)'
         Write-Host '    status      Health check dos endpoints'
         Write-Host '    ps          Containers'
         Write-Host '    logs        Follow logs'
@@ -92,7 +111,14 @@ switch ($Target) {
     'appd'       { Assert-EnvVar (Get-DotEnv) @('APPDYNAMICS_AGENT_ACCOUNT_NAME'); Invoke-Compose $APPD   @('up','-d','--build') }
     'appd-db'    { Assert-EnvVar (Get-DotEnv) @('APPDYNAMICS_AGENT_ACCOUNT_NAME'); Invoke-Compose $APPDDB @('up','-d','--build') }
     'te'         { Assert-EnvVar (Get-DotEnv) @('TE_ACCOUNT_TOKEN'); Invoke-Compose $TE @('up','-d') }
-    'tunnel'     { Assert-EnvVar (Get-DotEnv) @('CLOUDFLARE_TUNNEL_TOKEN'); Invoke-Compose $TUNNEL @('up','-d') }
+    'tunnel' {
+        Get-DotEnv | Out-Null
+        Invoke-Compose $TUNNEL @('up','-d')
+        Write-Host '  Quick Tunnel subindo - aguardando a URL publica...'
+        Show-TunnelUrl
+    }
+    'tunnel-url'   { Show-TunnelUrl }
+    'tunnel-named' { Assert-EnvVar (Get-DotEnv) @('CLOUDFLARE_TUNNEL_TOKEN'); Invoke-Compose $TUNNELN @('up','-d') }
     'all' {
         Assert-EnvVar (Get-DotEnv) @('SPLUNK_ACCESS_TOKEN','APPDYNAMICS_AGENT_ACCOUNT_NAME')
         Invoke-Compose $ALL @('up','-d','--build')
