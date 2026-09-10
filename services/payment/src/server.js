@@ -30,7 +30,18 @@ setInterval(() => {
 }, 180000);
 
 app.use(express.json());
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'payment-service', degraded }));
+// Durante a janela de degradacao o health responde 503. Sem isso os testes
+// sinteticos do ThousandEyes nunca falham - eles batem em /health, que
+// respondia 200 mesmo com o adquirente fora - e nenhum alerta dispara na demo.
+// HEALTH_503_WHEN_DEGRADED=false devolve o comportamento antigo.
+const HEALTH_FAILS = (process.env.HEALTH_503_WHEN_DEGRADED || 'true') !== 'false';
+app.get('/health', (req, res) => {
+  if (degraded && HEALTH_FAILS) {
+    return res.status(503).json({ status: 'degraded', service: 'payment-service',
+                                  reason: 'acquirer_unavailable', degraded });
+  }
+  res.json({ status: 'ok', service: 'payment-service', degraded });
+});
 
 app.post('/charge', async (req, res) => {
   await tracer.startActiveSpan('payment.charge', async (span) => {

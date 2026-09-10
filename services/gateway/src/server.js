@@ -9,6 +9,7 @@ const sec = require('./security');
 const app  = express();
 const PORT = parseInt(process.env.APP_PORT || '8080', 10);
 const ORDERS_URL = process.env.ORDERS_URL || 'http://orders-service:8081';
+const PAYMENT_URL = process.env.PAYMENT_URL || 'http://payment-service:8082';
 const tracer = trace.getTracer('gateway-service');
 const meter  = metrics.getMeter('gateway-service');
 
@@ -117,6 +118,38 @@ function postJSON(url, body, timeoutMs = 15000) {
 }
 
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'gateway-service' }));
+
+// Health de cadeia: consulta orders e payment antes de responder.
+// /health responde pela borda; este responde pela jornada, entao cai junto com
+// a janela de degradacao do payment. E o alvo certo pro teste sintetico que
+// precisa enxergar falha de dependencia, nao so "o processo esta de pe".
+const DEEP_TIMEOUT_MS = parseInt(process.env.DEEP_HEALTH_TIMEOUT_MS || '3000', 10);
+function probe(url) {
+  return new Promise(resolve => {
+    const req = http.get(url, { timeout: DEEP_TIMEOUT_MS }, r => {
+      r.resume();
+      resolve({ ok: r.statusCode < 400, status: r.statusCode });
+    });
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false, status: 'timeout' }); });
+    req.on('error', e => resolve({ ok: false, status: e.code || 'error' }));
+  });
+}
+
+app.get('/health/deep', async (req, res) => {
+  const [orders, payment] = await Promise.all([
+    probe(`${ORDERS_URL}/health`),
+    probe(`${PAYMENT_URL}/health`),
+  ]);
+  const ok = orders.ok && payment.ok;
+  const body = {
+    status: ok ? 'ok' : 'degraded',
+    service: 'gateway-service',
+    dependencies: { orders: orders.status, payment: payment.status },
+  };
+  if (!ok) sec.logSecurity({ event_type: 'health_check', outcome: 'degraded',
+                             detail: `orders=${orders.status} payment=${payment.status}` });
+  res.status(ok ? 200 : 503).json(body);
+});
 
 app.get('/api/products', async (req, res) => {
   await tracer.startActiveSpan('catalogue.list', async (span) => {
