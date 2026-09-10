@@ -1,0 +1,170 @@
+<form version="1.1" theme="dark">
+  <label>Fraude - obs-lab</label>
+  <description>Os 6 fluxos de fraude do lab, do volume ao evento cru. Fonte: logs do gateway via HEC (index=lab).</description>
+
+  <init>
+    <!-- sem isso o painel de eventos crus quebra antes do primeiro clique na tabela de risco -->
+    <set token="ip_selecionado">*</set>
+  </init>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="tempo">
+      <label>Periodo</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="filtro_ameaca" searchWhenChanged="true">
+      <label>Ameaca</label>
+      <choice value="threat=*">Todas</choice>
+      <choice value="threat=brute_force">Brute force</choice>
+      <choice value="threat=account_takeover">Account takeover</choice>
+      <choice value="threat=price_tampering">Price tampering</choice>
+      <choice value="threat=card_testing">Card testing</choice>
+      <choice value="threat=velocity_abuse">Velocity abuse</choice>
+      <choice value="threat=bot_scraping">Bot scraping</choice>
+      <default>threat=*</default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <single>
+        <title>Eventos de fraude</title>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[100,1000]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Bloqueados pelo gateway</title>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ blocked=true | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unitPosition">after</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>IPs distintos</title>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ | stats dc(client_ip)</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Prejuizo evitado (checkout)</title>
+        <search>
+          <query>`obs_lab_fraud` threat=price_tampering | rex field=detail "diff=(?&lt;prejuizo&gt;[\d.]+)" | stats sum(prejuizo) as total | eval total=round(total,2)</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unit">R$</option>
+        <option name="unitPosition">before</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Volume por ameaca no tempo</title>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ | timechart span=10m count by threat</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Distribuicao por ameaca</title>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ | stats count by threat | sort - count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Risco acumulado por IP - o mesmo IP em duas ou mais ameacas e o caso que vale abrir</title>
+        <search>
+          <query>`obs_lab_fraud` | stats sum(risk_score) as risco_total, dc(threat) as tipos, values(threat) as ataques, count as eventos, max(eval(if(blocked="true",1,0))) as houve_bloqueio by client_ip | sort - risco_total | head 15</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">cell</option>
+        <format type="color" field="risco_total">
+          <colorPalette type="minMidMax" maxColor="#DC4E41" midColor="#F8BE34" minColor="#53A051"></colorPalette>
+        </format>
+        <format type="number" field="risco_total">
+          <option name="precision">0</option>
+        </format>
+        <drilldown>
+          <set token="ip_selecionado">$row.client_ip$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Contas sob ataque</title>
+        <search>
+          <query>`obs_lab_security` (threat=brute_force OR threat=account_takeover OR outcome=fail) username=* | stats count as eventos, dc(client_ip) as ips, values(threat) as ameacas, max(risk_score) as risco by username | sort - risco | head 10</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>User-Agents de bot</title>
+        <search>
+          <query>`obs_lab_fraud` threat=bot_scraping | stats count as requisicoes, dc(client_ip) as ips by user_agent | sort - requisicoes | head 10</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Eventos crus - IP: $ip_selecionado$ (clique na tabela de risco para filtrar)</title>
+      <table>
+        <search>
+          <query>`obs_lab_fraud` $filtro_ameaca$ client_ip="$ip_selecionado$" | table _time, threat, event_type, client_ip, username, risk_score, blocked, detail | sort - _time | head 50</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="count">20</option>
+        <format type="color" field="blocked">
+          <colorPalette type="map">{"true":#DC4E41,"false":#F8BE34}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

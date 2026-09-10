@@ -57,6 +57,18 @@ ThousandEyes e a URL do túnel.
 
 ---
 
+## Deteccao de fraude no Splunk Enterprise
+
+O gateway gera 6 fluxos de fraude (`brute_force`, `account_takeover`,
+`price_tampering`, `card_testing`, `velocity_abuse`, `bot_scraping`), cada um
+como uma linha JSON com `risk_score` e `blocked`.
+
+O app em `splunk-app/obs_lab_fraud/` transforma isso em 7 buscas agendadas e um
+dashboard, usando so Splunk Enterprise - sem ES, sem Security Essentials e sem
+KVStore. Instalacao e detalhes em [`splunk-app/README.md`](splunk-app/README.md).
+
+---
+
 ## Segredos
 
 Nenhuma credencial mora no repositório. Todas vêm do `.env`, que está no
