@@ -54,7 +54,15 @@ setInterval(async () => {
 }, RESTOCK_EVERY_S * 1000);
 
 app.use(express.json());
+// Alem da checagem real do Postgres, uma fracao das chamadas falha de
+// proposito: sem isso o teste sintetico so veria erro se o banco caisse, e o
+// lab passaria dias sem um unico alerta pra demonstrar.
+const HEALTH_ERROR_RATE = () => parseFloat(process.env.HEALTH_ERROR_RATE || '0.03');
 app.get('/health', async (req, res) => {
+  if (Math.random() < HEALTH_ERROR_RATE()) {
+    return res.status(503).json({ status: 'degraded', service: 'orders-service',
+                                  db: 'up', reason: 'connection_pool_exhausted' });
+  }
   try {
     await pool.query('SELECT 1');
     res.json({ status: 'ok', service: 'orders-service', db: 'up' });

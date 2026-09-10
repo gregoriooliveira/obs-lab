@@ -30,15 +30,19 @@ setInterval(() => {
 }, 180000);
 
 app.use(express.json());
-// Durante a janela de degradacao o health responde 503. Sem isso os testes
-// sinteticos do ThousandEyes nunca falham - eles batem em /health, que
-// respondia 200 mesmo com o adquirente fora - e nenhum alerta dispara na demo.
-// HEALTH_503_WHEN_DEGRADED=false devolve o comportamento antigo.
-const HEALTH_FAILS = (process.env.HEALTH_503_WHEN_DEGRADED || 'true') !== 'false';
+// O /health falha por PROBABILIDADE, do mesmo jeito que o ERROR_RATE do
+// /charge - nao por janela fixa. Antes ele respondia 200 sempre, e os testes
+// sinteticos do ThousandEyes nunca viam falha nenhuma; travar 503 durante toda
+// a janela de degradacao ia pro outro extremo (falha previsivel de 45s).
+// Aqui a checagem cai as vezes, e cai bem mais durante a degradacao.
+const HEALTH_ERROR_RATE      = () => parseFloat(process.env.HEALTH_ERROR_RATE || '0.04');
+const HEALTH_ERROR_RATE_DEGR = () => parseFloat(process.env.HEALTH_ERROR_RATE_DEGRADED || '0.35');
 app.get('/health', (req, res) => {
-  if (degraded && HEALTH_FAILS) {
+  const rate = degraded ? HEALTH_ERROR_RATE_DEGR() : HEALTH_ERROR_RATE();
+  if (Math.random() < rate) {
     return res.status(503).json({ status: 'degraded', service: 'payment-service',
-                                  reason: 'acquirer_unavailable', degraded });
+                                  reason: degraded ? 'acquirer_unavailable' : 'acquirer_timeout',
+                                  degraded });
   }
   res.json({ status: 'ok', service: 'payment-service', degraded });
 });
@@ -115,5 +119,5 @@ app.post('/charge', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[payment-service] :${PORT} | error_rate=${process.env.ERROR_RATE || '0.10'} | degradação a cada 3min`);
+  console.log(`[payment-service] :${PORT} | error_rate=${process.env.ERROR_RATE || '0.10'} | degradação a cada 3min | health_error_rate=${process.env.HEALTH_ERROR_RATE || '0.04'}`);
 });
