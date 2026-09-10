@@ -22,7 +22,7 @@ cp .env.example .env
 ${EDITOR:-vi} .env             # preencher credenciais dos vendors
 
 # escolha um dos dois modos:
-make all                       # A) docker-compose
+make stack                     # A) docker-compose (sobe todo vendor do .env)
 ./k8s-lab.sh up                # B) Kubernetes (kind)
 ```
 
@@ -34,6 +34,26 @@ make status         # modo A
 ```
 
 `bootstrap.sh --check` só verifica pré-requisitos, sem instalar nada.
+
+---
+
+## Por que todo alvo sobe o stack inteiro
+
+As credenciais de cada vendor entram nos containers por **env var de overlay**,
+não pela imagem. Um `docker compose -f base -f splunk up -d` recria
+gateway/orders/payment **sem** as `APPDYNAMICS_*` — o agente some, o container
+continua `Up` e o application no controller fica vazio, sem um único erro no log.
+Foi exatamente isso que aconteceu em 2026-09-10.
+
+Por isso `scripts/active-overlays.sh` monta a lista de overlays a partir do que
+está preenchido no `.env`, e todo alvo (`splunk`, `appd`, `te`, `tunnel`,
+`rebuild`, `logs`, `ps`, `clean`) usa essa lista completa. Quem quiser rodar sem
+vendor nenhum usa `make base`, que avisa antes.
+
+`make status` fecha o ciclo: além do health check dos endpoints, ele prova a
+exportação de cada vendor habilitado — spans no Splunk O11y, logs entregues no
+HEC, env do agente presente nos 3 tiers do AppD, `identity.json` do
+ThousandEyes e a URL do túnel.
 
 ---
 
@@ -60,7 +80,7 @@ Regras:
 
 | | **A. docker-compose** | **B. Kubernetes (kind)** |
 |---|---|---|
-| Subir | `make all` | `./k8s-lab.sh up` |
+| Subir | `make stack` | `./k8s-lab.sh up` |
 | RAM | ~3 GB | ~10 GB (full) / ~5 GB (lite) |
 | Gateway | `localhost:8080` | `localhost:18080` |
 | `deployment.environment` | `lab` | `lab-k8s` |
@@ -272,16 +292,18 @@ ataques vêm de IPs fixos da faixa de documentação (`203.0.113.x`,
 ### Modo A — docker-compose
 
 ```bash
-make up          # só a app (sem vendor)
-make splunk      # + Splunk Observability
-make splunk-hec  # + logs pro Splunk Core (precisa do HEC no .env)
-make appd        # + AppDynamics APM
-make appd-db     # + AppD APM e Database Agent
-make te          # + ThousandEyes Enterprise Agent
-make all         # Splunk + AppD APM + AppD DB Agent
+make stack       # sobe app + TODOS os vendores habilitados no .env (canônico)
+make up          # alias de stack
+make base        # só a app, sem vendor — derruba a instrumentação de propósito
+make splunk      # exige Splunk no .env, e sobe o stack completo
+make splunk-hec  # exige HEC no .env, e sobe o stack completo
+make appd        # exige AppD no .env, e sobe o stack completo
+make appd-db     # idem, com Database Agent
+make te          # exige TE no .env, e sobe o stack completo
+make all         # exige Splunk + AppD, e sobe o stack completo
 make tunnel      # Cloudflare Quick Tunnel (URL publica gratis)
 make tunnel-url  # mostra a URL *.trycloudflare.com
-make status      # health check
+make status      # health check + prova de exportação por vendor
 make logs        # follow dos logs
 make clean       # derruba tudo e remove volumes
 ```

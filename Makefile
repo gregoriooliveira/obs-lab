@@ -1,14 +1,14 @@
-.PHONY: help up down splunk splunk-hec appd appd-db te all tunnel tunnel-url tunnel-named logs ps clean rebuild status hooks secrets-scan k8s-up k8s-status k8s-down
+.PHONY: help up base stack down splunk splunk-hec appd appd-db te all tunnel tunnel-url tunnel-named logs ps clean rebuild status hooks secrets-scan k8s-up k8s-status k8s-down
 
 BASE    := docker compose -f docker-compose.yml
-SPLUNK  := $(BASE) -f docker-compose.splunk.yml
-HEC     := $(SPLUNK) -f docker-compose.splunk-hec.yml
-APPD    := $(BASE) -f docker-compose.appd.yml
-APPDDB  := $(APPD) -f docker-compose.appd-db.yml
-TE      := $(BASE) -f docker-compose.thousandeyes.yml
-TUNNEL  := $(BASE) -f docker-compose.tunnel.yml
-TUNNELN := $(BASE) -f docker-compose.tunnel-named.yml
-ALL     := $(BASE) -f docker-compose.splunk.yml -f docker-compose.appd.yml -f docker-compose.appd-db.yml
+TUNNEL   = docker compose $(shell bash scripts/active-overlays.sh) -f docker-compose.tunnel.yml
+TUNNELN  = docker compose $(shell bash scripts/active-overlays.sh) -f docker-compose.tunnel-named.yml
+
+# STACK = base + TODOS os overlays que o .env habilita (ver scripts/active-overlays.sh).
+# Subir vendor por vendor recriava os apps so com aquele overlay e apagava as env
+# vars dos outros - o AppD parava de reportar sem erro no log. Por isso todo alvo
+# de vendor sobe o conjunto inteiro.
+STACK   = docker compose $(shell bash scripts/active-overlays.sh)
 
 ## Default: show help
 help:
@@ -18,7 +18,8 @@ help:
 	@echo "  Usage: make <target>"
 	@echo ""
 	@echo "  Targets:"
-	@echo "    up         Start base stack (app + postgres + load-gen)"
+	@echo "    up/stack   Sobe app + TODOS os vendores habilitados no .env"
+	@echo "    base       So a app, sem vendor (derruba a instrumentacao)"
 	@echo "    splunk     Start with Splunk O11y (metrics + APM + DBM)"
 	@echo "    splunk-hec Same as splunk + logs to Splunk Core via HEC"
 	@echo "    appd       Start with AppDynamics APM (set APPDYNAMICS_* in .env)"
@@ -30,7 +31,7 @@ help:
 	@echo "    tunnel-named  Named tunnel (needs domain + CLOUDFLARE_TUNNEL_TOKEN)"
 	@echo "    logs       Follow logs from all containers"
 	@echo "    ps         Show running containers"
-	@echo "    status     Health check all endpoints"
+	@echo "    status     Health check + prova de exportacao por vendor"
 	@echo "    rebuild    Rebuild images and restart"
 	@echo "    clean      Stop everything and remove volumes"
 	@echo "    hooks      Install anti-secret-leak git pre-commit hook"
@@ -42,44 +43,49 @@ help:
 	@echo "    k8s-down   Destroi o cluster"
 	@echo ""
 
-## Base stack only (debug/stdout output)
-up: _check-env
-	$(BASE) up -d --build
+## Sobe o lab com tudo que o .env habilita (alias de stack)
+up: stack
 	@echo ""
 	@echo "  ✓ Demo app:        http://localhost:8080"
 	@echo "  ✓ OTel zPages:     http://localhost:55679/debug/tracez"
 	@echo "  ✓ Collector stats: http://localhost:8888/metrics"
 	@echo ""
 
+## SO a app, sem nenhum vendor (debug/stdout). Recria os containers sem as env
+## vars dos agentes - use de proposito, nao no meio de uma demo.
+base: _check-env
+	@echo "  ! 'make base' derruba a instrumentacao dos vendores; volte com 'make stack'"
+	$(BASE) up -d --build
+
+## Sobe base + todos os overlays habilitados no .env (alvo canonico)
+stack: _check-env
+	@echo "  overlays ativos: $$(bash scripts/active-overlays.sh)"
+	$(STACK) up -d --build
+	@$(MAKE) --no-print-directory status
+
 ## Splunk Observability (metrics + APM + DBM)
-splunk: _check-env _check-splunk
-	$(SPLUNK) up -d --build
+splunk: _check-env _check-splunk stack
 	@echo "  ✓ Metricas/APM/DBM -> Splunk Observability"
 
 ## Splunk Observability + logs para Splunk Core via HEC
-splunk-hec: _check-env _check-splunk _check-hec
-	$(HEC) up -d --build
+splunk-hec: _check-env _check-splunk _check-hec stack
 	@echo "  ✓ Metricas/APM/DBM -> Splunk Observability"
 	@echo "  ✓ Logs -> Splunk Core via HEC"
 
 ## AppDynamics APM
-appd: _check-env _check-appd
-	$(APPD) up -d --build
+appd: _check-env _check-appd stack
 	@echo "  ✓ Exporting to AppDynamics"
 
 ## AppDynamics APM + Database Agent
-appd-db: _check-env _check-appd
-	$(APPDDB) up -d --build
+appd-db: _check-env _check-appd stack
 	@echo "  ✓ AppDynamics APM + DB Agent"
 
 ## ThousandEyes Enterprise Agent
-te: _check-env _check-te
-	$(TE) up -d --build
+te: _check-env _check-te stack
 	@echo "  ✓ ThousandEyes Enterprise Agent"
 
 ## All vendors simultaneously (Splunk + AppDynamics APM + AppD DB agent)
-all: _check-env _check-splunk _check-appd
-	$(ALL) up -d --build
+all: _check-env _check-splunk _check-appd stack
 	@echo "  ✓ Exporting to Splunk + AppDynamics"
 
 ## Cloudflare Quick Tunnel (gratis, sem dominio e sem token)
@@ -97,15 +103,15 @@ tunnel-named: _check-env _check-tunnel
 	$(TUNNELN) up -d
 	@echo "  ✓ Tunnel nomeado ativo – veja o hostname em Zero Trust > Networks > Tunnels"
 
-## Follow logs (todos os overlays)
+## Follow logs (todos os overlays ativos)
 logs:
-	$(ALL) logs -f --tail=100
+	$(STACK) logs -f --tail=100
 
 ## Show running containers
 ps:
-	$(ALL) ps
+	$(STACK) ps
 
-## Hit main endpoints and report HTTP status
+## Hit main endpoints, conferir instrumentacao e exportacao real
 status:
 	@echo "=== Health check ==="
 	@curl -sf http://localhost:8080/health       >/dev/null && echo "  gateway  /health        OK" || echo "  gateway  /health        FAIL"
@@ -113,14 +119,15 @@ status:
 	@curl -sf http://localhost:8082/health       >/dev/null && echo "  payment  /health        OK" || echo "  payment  /health        FAIL"
 	@curl -sf http://localhost:8080/api/products >/dev/null && echo "  gateway  /api/products  OK" || echo "  gateway  /api/products  FAIL"
 	@curl -sf http://localhost:13133/            >/dev/null && echo "  otel-collector health   OK" || echo "  otel-collector health   n/a"
+	@bash scripts/check-exports.sh
 
 ## Rebuild images
 rebuild:
-	$(BASE) up -d --build --force-recreate
+	$(STACK) up -d --build --force-recreate
 
 ## Full cleanup
 clean:
-	$(ALL) down -v --remove-orphans
+	$(STACK) down -v --remove-orphans
 
 # ── Internal guards ──────────────────────────────────────────────────────────
 # .env e lido pelo docker compose automaticamente; aqui so validamos presenca.
