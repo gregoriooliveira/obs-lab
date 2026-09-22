@@ -5,18 +5,18 @@
 // security_events no Postgres (-> visivel via consultas / DBM).
 const crypto = require('crypto');
 const { trace } = require('@opentelemetry/api');
+const log = require('./log');
 
 const tracer = trace.getTracer('gateway-security');
 const sha256 = s => crypto.createHash('sha256').update(s).digest('hex');
 
 // ── Log estruturado (uma linha JSON por evento) ────────────────────────────
+// Passa pelo log.js para sair com severity e trace_id/span_id - e o que faz o
+// evento de fraude aparecer ligado ao trace no o11y, e nao como "unknown".
 function logSecurity(evt) {
-  console.log(JSON.stringify({
-    ts: new Date().toISOString(),
-    logger: 'security',
-    service: 'gateway-service',
-    ...evt,
-  }));
+  const sev = evt.blocked || (evt.risk_score || 0) >= 70 ? 'WARN' : 'INFO';
+  const msg = `${evt.threat || evt.event_type} ${evt.blocked ? 'blocked' : 'observed'}`;
+  log.emit(sev, msg, { logger: 'security', ...evt });
 }
 
 function clientIp(req) {

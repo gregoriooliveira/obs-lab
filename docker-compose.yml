@@ -18,6 +18,9 @@ services:
     environment:
       APP_PORT: 8080
       OTEL_SERVICE_NAME: gateway-service
+      # usados no log estruturado: deployment.environment e host.name
+      ENVIRONMENT: "${ENVIRONMENT:-lab}"
+      HOSTNAME_LAB: "${HOSTNAME_LAB:-obs-lab-host}"
       ORDERS_URL: http://orders-service:8081
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
       # auth + auditoria de fraude (users / security_events) vivem no Postgres
@@ -73,6 +76,9 @@ services:
     environment:
       APP_PORT: 8081
       OTEL_SERVICE_NAME: orders-service
+      # usados no log estruturado: deployment.environment e host.name
+      ENVIRONMENT: "${ENVIRONMENT:-lab}"
+      HOSTNAME_LAB: "${HOSTNAME_LAB:-obs-lab-host}"
       PAYMENT_URL: http://payment-service:8082
       ERROR_RATE: "${ERROR_RATE:-0.06}"
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
@@ -96,6 +102,9 @@ services:
     environment:
       APP_PORT: 8082
       OTEL_SERVICE_NAME: payment-service
+      # usados no log estruturado: deployment.environment e host.name
+      ENVIRONMENT: "${ENVIRONMENT:-lab}"
+      HOSTNAME_LAB: "${HOSTNAME_LAB:-obs-lab-host}"
       ERROR_RATE: "${ERROR_RATE:-0.10}"
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
     restart: unless-stopped

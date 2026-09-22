@@ -5,6 +5,7 @@ const express = require('express');
 const http = require('http');
 const { Pool } = require('pg');
 const { trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
+const log = require('./log');
 
 const app  = express();
 const PORT = parseInt(process.env.APP_PORT || '8081', 10);
@@ -37,7 +38,7 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-pool.on('error', (err) => console.error('[pg] pool error:', err.message));
+pool.on('error', (err) => log.error(`[pg] pool error: ${err.message}`, { logger: 'pg' }));
 
 // ── Reposicao de estoque ──────────────────────────────────────────────────
 // O lab roda 24/7: sem repor, o estoque semeado zera em minutos e TODO checkout
@@ -49,11 +50,14 @@ const RESTOCK_TO      = parseInt(process.env.RESTOCK_TO || '500', 10);
 setInterval(async () => {
   try {
     const r = await pool.query('UPDATE products SET stock = $1 WHERE stock < $2', [RESTOCK_TO, RESTOCK_BELOW]);
-    if (r.rowCount) console.log(`[orders-service] restock: ${r.rowCount} produto(s) -> ${RESTOCK_TO}`);
+    if (r.rowCount) log.info(`[orders-service] restock: ${r.rowCount} produto(s) -> ${RESTOCK_TO}`, { logger: 'restock', rows: r.rowCount });
   } catch (e) { /* db fora do ar: tenta de novo no proximo ciclo */ }
 }, RESTOCK_EVERY_S * 1000);
 
 app.use(express.json());
+// Access log estruturado: uma linha por request, com trace_id/span_id.
+// E o que da o vinculo log <-> trace no o11y (Related Content).
+app.use(log.httpMiddleware());
 // Alem da checagem real do Postgres, uma fracao das chamadas falha de
 // proposito: sem isso o teste sintetico so veria erro se o banco caisse, e o
 // lab passaria dias sem um unico alerta pra demonstrar.
@@ -170,7 +174,7 @@ async function persistOrder(orderId, customerId, amount, status, paymentId, item
       );
     }
   } catch (e) {
-    console.error('[pg] persist order failed:', e.message);
+    log.error(`[pg] persist order failed: ${e.message}`, { logger: 'pg' });
   }
 }
 
@@ -261,5 +265,5 @@ app.post('/orders', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[orders-service] :${PORT} → payment: ${PAYMENT_URL} | Postgres: ${process.env.DB_HOST || 'inventory-db'} | slow queries 8%`);
+  log.info(`[orders-service] :${PORT} → payment: ${PAYMENT_URL} | Postgres: ${process.env.DB_HOST || 'inventory-db'} | slow queries 8%`, { logger: 'startup', port: PORT });
 });

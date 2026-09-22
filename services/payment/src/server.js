@@ -2,6 +2,7 @@
 // payment-service – ponta da cadeia. Cenários realistas de erro e latência.
 const express = require('express');
 const { trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
+const log = require('./log');
 
 const app  = express();
 const PORT = parseInt(process.env.APP_PORT || '8082', 10);
@@ -22,14 +23,17 @@ const rand  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 let degraded = false;
 setInterval(() => {
   degraded = true;
-  console.log('[payment-service] *** INÍCIO janela de degradação (45s) ***');
+  log.warn('[payment-service] *** INÍCIO janela de degradação (45s) ***', { logger: 'degradation', degraded: true });
   setTimeout(() => {
     degraded = false;
-    console.log('[payment-service] --- fim janela de degradação ---');
+    log.info('[payment-service] --- fim janela de degradação ---', { logger: 'degradation', degraded: false });
   }, 45000);
 }, 180000);
 
 app.use(express.json());
+// Access log estruturado: uma linha por request, com trace_id/span_id.
+// E o que da o vinculo log <-> trace no o11y (Related Content).
+app.use(log.httpMiddleware());
 // O /health falha por PROBABILIDADE, do mesmo jeito que o ERROR_RATE do
 // /charge - nao por janela fixa. Antes ele respondia 200 sempre, e os testes
 // sinteticos do ThousandEyes nunca viam falha nenhuma; travar 503 durante toda
@@ -119,5 +123,5 @@ app.post('/charge', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[payment-service] :${PORT} | error_rate=${process.env.ERROR_RATE || '0.10'} | degradação a cada 3min | health_error_rate=${process.env.HEALTH_ERROR_RATE || '0.04'}`);
+  log.info(`[payment-service] :${PORT} | error_rate=${process.env.ERROR_RATE || '0.10'} | degradação a cada 3min | health_error_rate=${process.env.HEALTH_ERROR_RATE || '0.04'}`, { logger: 'startup', port: PORT });
 });

@@ -5,6 +5,7 @@ const http = require('http');
 const { Pool } = require('pg');
 const { trace, metrics, SpanStatusCode } = require('@opentelemetry/api');
 const sec = require('./security');
+const log = require('./log');
 
 const app  = express();
 const PORT = parseInt(process.env.APP_PORT || '8080', 10);
@@ -71,6 +72,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const rand  = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 
 app.use(express.json());
+// Access log estruturado: uma linha por request, com trace_id/span_id.
+// E o que da o vinculo log <-> trace no o11y (Related Content).
+app.use(log.httpMiddleware());
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
@@ -296,6 +300,6 @@ app.get('/api/debug/error', (req, res) => res.status(500).json({ error: 'forced'
 app.get('/api/debug/slow', async (req, res) => { await sleep(parseInt(req.query.ms || '2000')); res.json({ slept: true }); });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[gateway-service] :${PORT} → orders: ${ORDERS_URL} | cache miss 15% | security ON`);
-  bootstrapUsers().then(() => console.log('[gateway-service] users demo prontos (alice/bob/admin)'));
+  log.info(`[gateway-service] :${PORT} → orders: ${ORDERS_URL} | cache miss 15% | security ON`, { logger: 'startup', port: PORT });
+  bootstrapUsers().then(() => log.info('[gateway-service] users demo prontos (alice/bob/admin)', { logger: 'startup' }));
 });

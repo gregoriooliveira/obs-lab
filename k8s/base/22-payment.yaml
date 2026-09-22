@@ -37,6 +37,9 @@ spec:
             - { name: NODE_NAME,     valueFrom: { fieldRef: { fieldPath: spec.nodeName } } }
             - { name: APP_PORT,          value: "8082" }
             - { name: OTEL_SERVICE_NAME, value: payment-service }
+            # lidos pelo log estruturado (deployment.environment / host.name)
+            - { name: ENVIRONMENT,       value: lab-k8s }
+            - { name: HOSTNAME_LAB,      value: "$(NODE_NAME)" }
             - { name: ERROR_RATE,        value: "0.10" }
             - { name: LATENCY_JITTER_MS, value: "150" }
             - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://$(NODE_IP):4318" }

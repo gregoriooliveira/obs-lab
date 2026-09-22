@@ -37,6 +37,9 @@ spec:
             - { name: NODE_NAME,     valueFrom: { fieldRef: { fieldPath: spec.nodeName } } }
             - { name: APP_PORT,          value: "8081" }
             - { name: OTEL_SERVICE_NAME, value: orders-service }
+            # lidos pelo log estruturado (deployment.environment / host.name)
+            - { name: ENVIRONMENT,       value: lab-k8s }
+            - { name: HOSTNAME_LAB,      value: "$(NODE_NAME)" }
             - { name: PAYMENT_URL,       value: http://payment-service:8082 }
             - { name: ERROR_RATE,        value: "0.06" }
             - { name: LATENCY_JITTER_MS, value: "150" }
