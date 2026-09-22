@@ -164,7 +164,39 @@ host.arch, os.type, process.*, telemetry.sdk.*
 Valores conferidos: 14,7 req/s no total (21,6 de pico), 5,7 pedidos/s criados
 e 3,6 falhados, 117.506 USD de receita acumulada.
 
-### Duas armadilhas que aparecem so com dado real
+### A regra do rate() com counter cumulativo
+
+**O `BY` do `rate()` tem que conter TODAS as dimensoes que separam serie.**
+Se faltar alguma, o mstats junta series diferentes no mesmo grupo, le cada
+troca de serie como reset de counter e infla o numero de forma absurda.
+
+Medido no mesmo periodo, mesma metrica:
+
+| `BY` usado | Resultado |
+|---|---|
+| `BY status` | **1.934 rps** errado |
+| `BY status, route, "service.name"` | **13,4 rps** certo |
+
+Agrupe DEPOIS, no `timechart`. O `BY` do mstats e para identificar serie, nao
+para escolher a visao.
+
+E as dimensoes mudam por metrica, mesmo entre irmas:
+`orders.created.total` usa `payment_method`; `orders.failed.total` usa
+`reason`. Um `BY` unico com as duas retorna **vazio** — a dimensao ausente
+elimina a serie. Nesse caso sao dois `mstats` com `append`.
+
+### Graficos por dimensao precisam do timechart ... by
+
+`| mstats avg(_value) BY "container.name"` sozinho **nao separa** o grafico:
+a legenda sai como uma serie unica chamada `container.name`. Falta o segundo
+passo:
+
+```spl
+| mstats avg(_value) as cpu WHERE index=lab_metrics metric_name="container.cpu.utilization" span=1m BY "container.name"
+| timechart span=1m avg(cpu) by "container.name"
+```
+
+### Outras armadilhas
 
 **Histogramas viram tres metricas.** `http.request.duration` nao existe em
 `lab_metrics` — existem `http.request.duration_bucket`, `_count` e `_sum`. E o

@@ -253,7 +253,7 @@
       <chart>
         <title>Requisicoes por segundo, por status HTTP</title>
         <search>
-          <query>| mstats rate(_value) as rps WHERE index=lab_metrics metric_name="http.requests.total" span=1m BY status | timechart span=1m sum(rps) by status</query>
+          <query>| mstats rate(_value) as rps WHERE index=lab_metrics metric_name="http.requests.total" span=1m BY status, route, "service.name" | timechart span=1m sum(rps) by status</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -265,7 +265,7 @@
       <chart>
         <title>Erros 5xx por segundo</title>
         <search>
-          <query>| mstats rate(_value) as erros WHERE index=lab_metrics metric_name="http.errors.total" span=1m</query>
+          <query>| mstats rate(_value) as erros WHERE index=lab_metrics metric_name="http.errors.total" span=1m BY route, "service.name" | timechart span=1m sum(erros) as "erros 5xx/s"</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -278,9 +278,9 @@
   <row>
     <panel>
       <chart>
-        <title>Pedidos criados vs falhados (por minuto)</title>
+        <title>Pedidos criados vs falhados (por segundo)</title>
         <search>
-          <query>| mstats rate(_value) as v WHERE index=lab_metrics metric_name IN ("orders.created.total","orders.failed.total") span=1m BY metric_name | eval v=round(v*60,2) | timechart span=1m sum(v) by metric_name</query>
+          <query>| mstats rate(_value) as criados WHERE index=lab_metrics metric_name="orders.created.total" span=1m BY payment_method, "service.name" | timechart span=1m sum(criados) as criados | append [| mstats rate(_value) as falhados WHERE index=lab_metrics metric_name="orders.failed.total" span=1m BY reason, "service.name" | timechart span=1m sum(falhados) as falhados] | timechart span=1m sum(criados) as criados, sum(falhados) as falhados</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -319,7 +319,7 @@
       <chart>
         <title>CPU por container (%)</title>
         <search>
-          <query>| mstats avg(_value) as cpu WHERE index=lab_metrics metric_name="container.cpu.utilization" BY container.name span=1m</query>
+          <query>| mstats avg(_value) as cpu WHERE index=lab_metrics metric_name="container.cpu.utilization" span=1m BY "container.name" | timechart span=1m avg(cpu) by "container.name"</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -331,7 +331,7 @@
       <chart>
         <title>Memoria por container (bytes)</title>
         <search>
-          <query>| mstats avg(_value) as mem WHERE index=lab_metrics metric_name="container.memory.usage.total" BY container.name span=1m</query>
+          <query>| mstats avg(_value) as mem WHERE index=lab_metrics metric_name="container.memory.usage.total" span=1m BY "container.name" | timechart span=1m avg(mem) by "container.name"</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
