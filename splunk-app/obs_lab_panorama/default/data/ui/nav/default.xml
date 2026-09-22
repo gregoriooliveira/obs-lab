@@ -1,0 +1,4 @@
+<nav search_view="search" color="#dc4e41">
+  <view name="obs_lab_panorama" default="true"/>
+  <view name="search"/>
+</nav>

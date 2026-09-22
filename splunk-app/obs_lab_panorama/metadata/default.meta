@@ -1,0 +1,6 @@
+# O painel le os macros obs_lab_* do app obs_lab_fraud, que sao globais.
+# Por isso este app nao redefine nenhum deles - um macro duplicado em dois
+# apps vira conflito de precedencia e e dificil de achar depois.
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system
