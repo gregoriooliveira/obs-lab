@@ -1,5 +1,6 @@
 <nav search_view="search" color="#DC4E41">
-  <view name="fraude_obs_lab" default="true"/>
+  <view name="obs_lab_panorama" default="true"/>
+  <view name="fraude_obs_lab"/>
   <collection label="Deteccoes">
     <saved source="all" match="Fraude"/>
   </collection>

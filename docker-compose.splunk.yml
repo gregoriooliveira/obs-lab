@@ -32,6 +32,7 @@ services:
       SPLUNK_HEC_URL:          "${SPLUNK_HEC_URL}"
       SPLUNK_HEC_TOKEN:        "${SPLUNK_HEC_TOKEN}"
       SPLUNK_HEC_INDEX:        "${SPLUNK_HEC_INDEX:-main}"
+      SPLUNK_METRICS_INDEX:    "${SPLUNK_METRICS_INDEX:-lab_metrics}"
       DB_USER:                 "${DB_USER:-obslab}"
       DB_PASSWORD:             "${DB_PASSWORD:?defina DB_PASSWORD no .env}"
       DB_NAME:                 "${DB_NAME:-inventory}"

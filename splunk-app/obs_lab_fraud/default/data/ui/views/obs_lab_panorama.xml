@@ -1,0 +1,278 @@
+<form version="1.1" theme="dark">
+  <label>Panorama - obs-lab</label>
+  <description>Painel unico: negocio, experiencia externa (ThousandEyes), aplicacao, seguranca e infra. Fontes: index=lab (logs do collector via HEC), index=te (stream do ThousandEyes) e o indice de metricas do collector.</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="tempo">
+      <label>Periodo</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="filtro_servico" searchWhenChanged="true">
+      <label>Servico</label>
+      <choice value="service=*">Todos</choice>
+      <choice value="service=gateway-service">gateway</choice>
+      <choice value="service=orders-service">orders</choice>
+      <choice value="service=payment-service">payment</choice>
+      <default>service=*</default>
+    </input>
+  </fieldset>
+
+  <!-- ===================== NEGOCIO ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">NEGOCIO</h2>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <single>
+        <title>Checkouts tentados</title>
+        <search>
+          <query>`obs_lab_http` http_path="/api/checkout" | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Taxa de sucesso do checkout</title>
+        <search>
+          <query>`obs_lab_http` http_path="/api/checkout" | eval st=tonumber(http_status), ok=if(st&lt;400,1,0) | stats count as total, sum(ok) as sucesso | eval taxa=round(sucesso*100/total,1) | fields taxa</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unit">%</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0xdc4e41","0xf8be34","0x53a051"]</option>
+        <option name="rangeValues">[70,85]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Pedidos confirmados</title>
+        <search>
+          <query>`obs_lab_http` http_path="/api/checkout" http_status=201 | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Fraudes bloqueadas</title>
+        <search>
+          <query>`obs_lab_fraud` blocked=true | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[100,1000]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Checkout por faixa de status</title>
+        <search>
+          <query>`obs_lab_http` http_path="/api/checkout" | eval st=tonumber(http_status), faixa=case(st&lt;300,"2xx sucesso", st&lt;500,"4xx recusa", true(),"5xx erro") | timechart span=1m count by faixa</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- ===================== EXPERIENCIA EXTERNA ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">EXPERIENCIA EXTERNA - ThousandEyes</h2>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Disponibilidade HTTP por agente (%)</title>
+        <search>
+          <query>`obs_lab_te` | rename "metric_name:http.server.request.availability" as disp, "thousandeyes.source.agent.name" as agente | where isnotnull(disp) | timechart span=5m avg(disp) by agente</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY.maximumNumber">100</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Latencia de rede por agente (ms)</title>
+        <search>
+          <query>`obs_lab_te` | rename "metric_name:network.latency" as lat, "thousandeyes.source.agent.name" as agente | where isnotnull(lat) | eval lat_ms=lat*1000 | timechart span=5m avg(lat_ms) by agente</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Agentes do ThousandEyes - resumo do periodo</title>
+        <search>
+          <query>`obs_lab_te` | rename "metric_name:http.server.request.availability" as disp, "metric_name:network.latency" as lat, "metric_name:network.loss" as perda, "thousandeyes.source.agent.name" as agente, "thousandeyes.source.agent.location" as local | stats avg(disp) as disponibilidade, avg(lat) as lat_s, avg(perda) as perda_pct, count as amostras by agente, local | eval disponibilidade=round(disponibilidade,2), latencia_ms=round(lat_s*1000,2), perda_pct=round(perda_pct,2) | table agente, local, disponibilidade, latencia_ms, perda_pct, amostras | sort - amostras</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ===================== APLICACAO ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">APLICACAO</h2>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Latencia p95 por servico (ms)</title>
+        <search>
+          <query>`obs_lab_http` $filtro_servico$ | eval d=tonumber(duration_ms) | timechart span=1m perc95(d) by service</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Erros por servico e rota</title>
+        <search>
+          <query>`obs_lab_http` $filtro_servico$ | eval st=tonumber(http_status) | where st&gt;=400 | eval faixa=if(st&lt;500,"4xx","5xx") | stats count as erros by service, http_path, faixa, http_status | sort - erros | head 20</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">cell</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Ultimos erros com trace_id - use o trace para abrir o APM no o11y</title>
+        <search>
+          <query>`obs_lab_app` severity=ERROR $filtro_servico$ | table _time, service, message, http_status, duration_ms, trace_id | sort - _time | head 20</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ===================== SEGURANCA ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">SEGURANCA E FRAUDE</h2>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Ameacas detectadas no tempo</title>
+        <search>
+          <query>`obs_lab_fraud` | timechart span=5m count by threat</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Risco acumulado por IP (RBA sem ES)</title>
+        <search>
+          <query>`obs_lab_fraud` | stats sum(risk_score) as risco, dc(threat) as ameacas_distintas, count as eventos, values(threat) as tipos by client_ip | sort - risco | head 10</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- ===================== INFRAESTRUTURA ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">INFRAESTRUTURA</h2>
+        <p style="color:#888">Alimentado pelo exporter splunk_hec/metrics do OTel Collector. Exige o indice de metricas criado com datatype=metric - ver splunk-app/README.md.</p>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>CPU por container (%)</title>
+        <search>
+          <query>| mstats avg(_value) as cpu WHERE index=lab_metrics metric_name="container.cpu.utilization" BY container.name span=1m</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Memoria por container (bytes)</title>
+        <search>
+          <query>| mstats avg(_value) as mem WHERE index=lab_metrics metric_name="container.memory.usage.total" BY container.name span=1m</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+</form>

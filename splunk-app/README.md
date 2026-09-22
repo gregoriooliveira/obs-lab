@@ -68,3 +68,56 @@ JSON do gateway e não um envelope do runtime de container.
 e `services/gateway/src/server.js` (brute force, account takeover). Todo evento
 sai como uma linha JSON com `logger: "security"`, `threat`, `risk_score` e
 `blocked` — o `risk_score` já vem calculado pelo gateway; as buscas só agregam.
+
+---
+
+## Panorama - painel unico
+
+`obs_lab_panorama` e a view default do app. Junta num painel so:
+
+| Bloco | Fonte | Depende de |
+|---|---|---|
+| Negocio (checkout, taxa de sucesso, pedidos) | `index=lab` logger=http | so o HEC de logs |
+| Experiencia externa | `index=te` (stream do ThousandEyes) | integracao do TE |
+| Aplicacao (p95, erros, trace_id) | `index=lab` logger=http / severity=ERROR | so o HEC de logs |
+| Seguranca e fraude | `index=lab` logger=security | so o HEC de logs |
+| Infraestrutura (CPU/memoria por container) | `index=lab_metrics` | **exige o passo abaixo** |
+
+### Indice de metricas
+
+Os quatro primeiros blocos funcionam sem configurar nada alem do que o lab ja
+tem. O bloco de INFRAESTRUTURA depende de um indice de **metricas**:
+
+```
+# Settings > Indexes > New Index
+#   Index Name : lab_metrics
+#   Index Data Type : Metrics        <- NAO deixe em Events
+```
+
+Depois libere o indice no token do HEC (`obs-lab`) em
+Settings > Data inputs > HTTP Event Collector > obs-lab > Selected indexes.
+
+E no `.env` do servidor:
+
+```
+SPLUNK_METRICS_INDEX=lab_metrics
+```
+
+`make rebuild` recria o collector com o exporter `splunk_hec/metrics`.
+
+Conferir que chegou:
+
+```
+| mstats avg(_value) WHERE index=lab_metrics metric_name="container.cpu.utilization" BY container.name span=1m
+```
+
+**Armadilha:** se o indice for de eventos, o HEC responde `200` e o dado
+simplesmente some - nao aparece em `search` nem em `mstats`. Nao ha erro no log
+do collector.
+
+### O que NAO vem por aqui
+
+As metricas de **Splunk Synthetics** (`synthetics.*`) nascem no Observability
+Cloud, nao no collector - entao nao chegam ao Splunk Core por este caminho.
+Para traze-las e preciso o **Splunk Infrastructure Monitoring Add-on**
+(Splunkbase 4232), que puxa via SignalFlow com um token de API da org.

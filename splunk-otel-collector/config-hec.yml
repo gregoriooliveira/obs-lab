@@ -50,9 +50,33 @@ exporters:
     tls:
       insecure_skip_verify: true
 
+  # Mesmas metricas que vao pro Observability Cloud, tambem no Splunk Core.
+  # E o que permite um painel unico no Splunk com negocio + TE + seguranca +
+  # infra, sem depender do add-on de Infrastructure Monitoring.
+  #
+  # O indice PRECISA ser datatype=metric. Num indice de eventos o exporter
+  # entrega 200 e o dado some - nao aparece nem em search nem em mstats.
+  splunk_hec/metrics:
+    token: "${SPLUNK_HEC_TOKEN}"
+    endpoint: "${SPLUNK_HEC_URL}"
+    source: "obs-lab"
+    sourcetype: "obs-lab:metrics"
+    index: "${SPLUNK_METRICS_INDEX}"
+    tls:
+      insecure_skip_verify: true
+
 service:
   pipelines:
     logs:
       receivers:  [filelog]
       processors: [memory_limiter, batch, resource/logs]
       exporters:  [splunk_hec/core]
+
+    # A pipeline de metricas e REESCRITA aqui, nao complementada: quando o
+    # collector faz merge de dois --config, lista sobrescreve lista. Por isso
+    # os receivers e processors do config.yml aparecem repetidos - sem eles a
+    # pipeline ficaria so com o splunk_hec e o Observability Cloud pararia.
+    metrics:
+      receivers:  [host_metrics, docker_stats, postgresql, otlp]
+      processors: [memory_limiter, batch, resourcedetection, resource]
+      exporters:  [signalfx, splunk_hec/metrics]
