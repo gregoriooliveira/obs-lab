@@ -238,6 +238,72 @@
     </panel>
   </row>
 
+  <!-- ===================== APLICACAO - METRICAS ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">APLICACAO - METRICAS (OTLP via collector)</h2>
+        <p style="color:#888">As MESMAS metricas que a aplicacao manda pro Observability Cloud, agora tambem no Splunk. Counters OTLP sao cumulativos e o exporter splunk_hec nao converte pra delta - por isso rate(), nunca sum().</p>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Requisicoes por segundo</title>
+        <search>
+          <query>| mstats rate(_value) as rps WHERE index=lab_metrics metric_name="http.requests.total" span=1m</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">area</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Erros 5xx por segundo</title>
+        <search>
+          <query>| mstats rate(_value) as erros WHERE index=lab_metrics metric_name="http.errors.total" span=1m</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Pedidos criados vs falhados (por minuto)</title>
+        <search>
+          <query>| mstats rate(_value) as v WHERE index=lab_metrics metric_name IN ("orders.created.total","orders.failed.total") span=1m BY metric_name | eval v=round(v*60,2) | timechart span=1m sum(v) by metric_name</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <single>
+        <title>Receita no periodo (USD)</title>
+        <search>
+          <query>| mstats max(_value) as fim, min(_value) as ini WHERE index=lab_metrics metric_name="payment.revenue.total" | eval receita=round(fim-ini,2) | fields receita</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unit">USD</option>
+        <option name="unitPosition">before</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
   <!-- ===================== INFRAESTRUTURA ===================== -->
   <row>
     <panel>
