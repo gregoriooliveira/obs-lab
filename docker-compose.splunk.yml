@@ -16,6 +16,11 @@ services:
   splunk-otel-collector:
     image: quay.io/signalfx/splunk-otel-collector:latest
     container_name: obs-splunk-otel
+    # Sem isto o resourcedetection (detectors: [system], override: true) le o
+    # hostname do PROPRIO container - que o Docker define como o id - e o
+    # host.name das metricas sai "93a4eaa89b2d". Ai o Infrastructure nao casa
+    # com o host.name dos logs e o Related Content do log fica "Infra (0)".
+    hostname: "${HOSTNAME_LAB:-obs-lab-host}"
     user: "0:0"
     command: ["--config=/etc/otel/collector/custom_config.yaml"]
     environment:
