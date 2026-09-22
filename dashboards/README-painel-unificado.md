@@ -139,12 +139,46 @@ Destino sugerido: `index=appd`.
 | Experiencia externa — disponibilidade, latencia, perda por agente | `index=te` | ✅ |
 | Aplicacao — p95, erros por rota, erros com `trace_id` | `index=lab` | ✅ |
 | Seguranca — ameacas no tempo, risco acumulado por IP | `index=lab` logger=security | ✅ |
-| Aplicacao (metricas) — RPS, erros, receita, pedidos | `index=lab_metrics` | ⏳ apos `make rebuild` |
-| Infraestrutura — CPU/memoria por container, host | `index=lab_metrics` | ⏳ apos `make rebuild` |
+| Aplicacao (metricas) — RPS, erros, receita, pedidos | `index=lab_metrics` | ✅ |
+| Infraestrutura — CPU/memoria por container, host | `index=lab_metrics` | ✅ |
 | Sinteticos — uptime, duracao, TTFB | SIM Add-on | ⏳ |
 | APM de terceiro | AppDynamics Add-on | ⏳ |
 
 ---
+
+## Medido em 2026-09-22, depois do primeiro `make rebuild`
+
+**76 metricas** chegaram em `lab_metrics`: 11 da aplicacao (OTLP), 13 de
+container (docker_stats), 21 de host (host_metrics), 20 do Postgres, mais os
+histogramas quebrados em `_bucket`/`_count`/`_sum`.
+
+Dimensoes de `http.requests.total` — sao ricas, da para quebrar o painel:
+
+```
+service.name, route, method, status, deployment.environment,
+host.arch, os.type, process.*, telemetry.sdk.*
+```
+
+`BY` com nome pontuado funciona **entre aspas**: `BY "service.name", route, status`.
+
+Valores conferidos: 14,7 req/s no total (21,6 de pico), 5,7 pedidos/s criados
+e 3,6 falhados, 117.506 USD de receita acumulada.
+
+### Duas armadilhas que aparecem so com dado real
+
+**Histogramas viram tres metricas.** `http.request.duration` nao existe em
+`lab_metrics` — existem `http.request.duration_bucket`, `_count` e `_sum`. E o
+formato Prometheus. Para media: `_sum / _count`.
+
+**`max(_value) - min(_value)` em counter da numero errado.** O painel de
+receita usava isso e reportou 43.500 USD contra 117.506 reais. Duas causas
+somadas: sao **3 series** (uma por `method`) e o restart do container
+**zera o counter**. O certo e `latest(_value)` por serie e somar:
+
+```spl
+| mstats latest(_value) as v WHERE index=lab_metrics metric_name="payment.revenue.total" BY method
+| stats sum(v) as receita
+```
 
 ## Conferir depois do `make rebuild`
 

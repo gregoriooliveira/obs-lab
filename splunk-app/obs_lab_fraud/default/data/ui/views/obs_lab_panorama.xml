@@ -251,9 +251,9 @@
   <row>
     <panel>
       <chart>
-        <title>Requisicoes por segundo</title>
+        <title>Requisicoes por segundo, por status HTTP</title>
         <search>
-          <query>| mstats rate(_value) as rps WHERE index=lab_metrics metric_name="http.requests.total" span=1m</query>
+          <query>| mstats rate(_value) as rps WHERE index=lab_metrics metric_name="http.requests.total" span=1m BY status | timechart span=1m sum(rps) by status</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -291,9 +291,9 @@
     </panel>
     <panel>
       <single>
-        <title>Receita no periodo (USD)</title>
+        <title>Receita acumulada desde o start do payment (USD)</title>
         <search>
-          <query>| mstats max(_value) as fim, min(_value) as ini WHERE index=lab_metrics metric_name="payment.revenue.total" | eval receita=round(fim-ini,2) | fields receita</query>
+          <query>| mstats latest(_value) as v WHERE index=lab_metrics metric_name="payment.revenue.total" BY method | stats sum(v) as receita | eval receita=round(receita,2) | fields receita</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
