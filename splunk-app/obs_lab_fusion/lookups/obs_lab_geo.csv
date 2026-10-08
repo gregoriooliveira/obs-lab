@@ -1,0 +1,29 @@
+cidr,pais,cidade,lat,lon,ator
+198.18.0.0/26,Brasil,Sao Paulo,-23.55,-46.63,cliente
+198.18.0.64/26,Brasil,Rio de Janeiro,-22.91,-43.17,cliente
+198.18.0.128/26,Brasil,Belo Horizonte,-19.92,-43.94,cliente
+198.18.0.192/26,Brasil,Porto Alegre,-30.03,-51.23,cliente
+192.0.2.10/32,Brasil,Sao Paulo,-23.55,-46.63,cliente
+192.0.2.11/32,Brasil,Campinas,-22.91,-47.06,cliente
+203.0.113.66/32,Estados Unidos,Ashburn,39.04,-77.49,atacante
+203.0.113.67/32,Alemanha,Frankfurt,50.11,8.68,atacante
+203.0.113.68/32,Singapura,Singapura,1.35,103.82,atacante
+203.0.113.77/32,Russia,Moscou,55.76,37.62,atacante
+203.0.113.78/32,Romenia,Bucareste,44.43,26.10,atacante
+203.0.113.88/32,Nigeria,Lagos,6.52,3.38,atacante
+203.0.113.89/32,Vietna,Ho Chi Minh,10.82,106.63,atacante
+203.0.113.90/32,Indonesia,Jacarta,-6.21,106.85,atacante
+203.0.113.99/32,Brasil,Recife,-8.05,-34.88,atacante
+203.0.113.100/32,Argentina,Buenos Aires,-34.60,-58.38,atacante
+198.51.100.42/32,China,Xangai,31.23,121.47,atacante
+198.51.100.43/32,Coreia do Sul,Seul,37.57,126.98,atacante
+198.51.100.60/32,Paises Baixos,Amsterda,52.37,4.90,atacante
+198.51.100.61/32,India,Mumbai,19.08,72.88,atacante
+198.51.100.62/32,Mexico,Cidade do Mexico,19.43,-99.13,atacante
+198.51.100.63/32,Turquia,Istambul,41.01,28.98,atacante
+198.51.100.64/32,Polonia,Varsovia,52.23,21.01,atacante
+198.51.100.65/32,Colombia,Bogota,4.71,-74.07,atacante
+198.51.100.66/32,Paquistao,Karachi,24.86,67.01,atacante
+198.51.100.67/32,Bulgaria,Sofia,42.70,23.32,atacante
+203.0.113.200/32,Portugal,Lisboa,38.72,-9.14,atacante
+203.0.113.201/32,Africa do Sul,Joanesburgo,-26.20,28.05,atacante

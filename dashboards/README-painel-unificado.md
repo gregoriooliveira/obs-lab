@@ -83,7 +83,7 @@ Campos uteis: `metric_name:http.server.request.availability`,
 
 ---
 
-## Fonte 3 — Observability Cloud ⏳ A FAZER
+## Fonte 3 — Observability Cloud (Synthetics ✅, resto ⏳)
 
 O que **so existe no o11y** e nao passa pelo collector:
 
@@ -92,15 +92,14 @@ O que **so existe no o11y** e nao passa pelo collector:
 - Metricas derivadas de **APM** (RED por servico, calculadas no o11y)
 - Estado de **detectores e alertas**
 
-**Caminho:** **Splunk Infrastructure Monitoring Add-on** — Splunkbase 4232.
+**Caminho:** **Splunk Infrastructure Monitoring Add-on** (instalado). Synthetics ja esta no Panorama pelos macros `obs_lab_synth_*`.
 
 Ele instala no Splunk Enterprise e traz duas coisas:
 
 1. O comando de busca `| sim`, que roda **SignalFlow de dentro do Splunk**:
 
    ```spl
-   | sim signalflow="data('synthetics.run.uptime.percent').mean(by=['test']).publish()"
-         earliest=-1h latest=now
+   | sim flow query="data('synthetics.run.uptime.percent').mean(by=['test']).publish()" resolution=60000
    ```
 
 2. Inputs modulares que replicam metricas do o11y para um indice do Splunk

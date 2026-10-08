@@ -1,6 +1,6 @@
 # obs_lab_fraud — app de detecção de fraude para Splunk Enterprise
 
-Detecta os 6 fluxos de fraude que o gateway do lab gera, usando só Splunk
+Detecta os 7 fluxos de fraude que o gateway do lab gera, usando só Splunk
 Enterprise: **sem Enterprise Security, sem Security Essentials e sem KVStore**.
 
 Isso não é uma limitação de gosto. O Splunk do lab roda num Xeon E7-4870
@@ -26,7 +26,7 @@ Depois: **Apps → obs-lab Fraude → Fraude - obs-lab**.
 |---|---|
 | `macros.conf` | `obs_lab_security` e `obs_lab_fraud` — a base de todas as buscas |
 | `props.conf` | extração JSON do sourcetype `obs-lab:container` |
-| `savedsearches.conf` | 6 detecções + 1 de risco acumulado, todas agendadas |
+| `savedsearches.conf` | 7 detecções + 1 de risco acumulado, todas agendadas |
 | `data/ui/views/fraude_obs_lab.xml` | dashboard com drilldown por IP |
 
 ## As detecções
@@ -39,6 +39,7 @@ Depois: **Apps → obs-lab Fraude → Fraude - obs-lab**.
 | Card testing | `card_testing` | 5 |
 | Velocity abuse em pedidos | `velocity_abuse` | 3 |
 | Bot scraping do catálogo | `bot_scraping` | 2 |
+| Credential stuffing | `credential_stuffing` | 4 |
 | **Risco acumulado por IP** | correlação | 5 |
 
 A última é a que vale na demo: soma o `risk_score` de todas as ameaças do mesmo
@@ -115,9 +116,11 @@ Conferir que chegou:
 simplesmente some - nao aparece em `search` nem em `mstats`. Nao ha erro no log
 do collector.
 
-### O que NAO vem por aqui
+### Synthetics
 
 As metricas de **Splunk Synthetics** (`synthetics.*`) nascem no Observability
-Cloud, nao no collector - entao nao chegam ao Splunk Core por este caminho.
-Para traze-las e preciso o **Splunk Infrastructure Monitoring Add-on**
-(Splunkbase 4232), que puxa via SignalFlow com um token de API da org.
+Cloud, nao no collector. O bloco EXPERIENCIA SINTETICA le direto da org com o
+comando `| sim flow` do **Splunk Infrastructure Monitoring Add-on** - consulta
+ao vivo, nada indexado. Os macros `obs_lab_synth_uptime`,
+`obs_lab_synth_duration` e `obs_lab_synth_failed` (em `obs_lab_fraud`) filtram
+os testes `OBS-LAB-*`.

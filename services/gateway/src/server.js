@@ -237,7 +237,18 @@ app.post('/api/login', async (req, res) => {
     try {
       const r = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
 
-      if (ipRate > 5 || userRate > 5) {
+      // stuffing antes do brute force: o ipRate da lista vazada tambem passa de
+      // 5, e sem este desvio o evento sairia como brute_force.
+      const stuff = sec.detectStuffing(ip, username);
+      if (stuff) {
+        reportFraud(stuff.evt);
+        if (stuff.blocked) {
+          span.setAttribute('auth.result', 'blocked_stuffing'); span.end();
+          return res.status(429).json({ error: 'too many attempts' });
+        }
+      }
+
+      if (!stuff && (ipRate > 5 || userRate > 5)) {
         const risk = Math.min(100, Math.max(ipRate, userRate) * 12);
         const evt = { event_type: 'login', threat: 'brute_force', username, client_ip: ip,
                       risk_score: risk, blocked: risk > 70,

@@ -1,0 +1,6 @@
+# Lookups e macros globais: o Panorama e as buscas ad-hoc tambem enriquecem
+# evento com geo/MITRE. Os macros-base (obs_lab_fraud, obs_lab_app...) vivem no
+# app obs_lab_fraud e NAO sao redefinidos aqui - mesma regra do Panorama.
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system

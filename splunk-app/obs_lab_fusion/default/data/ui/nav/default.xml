@@ -1,0 +1,4 @@
+<nav search_view="search" color="#7b56db">
+  <view name="fusion_center" default="true"/>
+  <view name="search"/>
+</nav>

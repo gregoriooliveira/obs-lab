@@ -124,7 +124,34 @@ function detectVelocity(customerId, ip) {
   return null;
 }
 
+// 5. CREDENTIAL STUFFING
+// Lista vazada testada contra a base: MUITOS usuarios distintos pelo mesmo IP.
+// O brute force e o contrario (um usuario, muitas senhas). Sem este detector
+// o `ipRate > 5` do login classificava stuffing como brute_force e travava a
+// conta da vitima - a tecnica (T1110.004 vs T1110.001) ficava errada.
+// Bloqueio de proposito acima do aviso: entre os dois cabe o "acerto" da lista,
+// que e o que alimenta o ATO e fecha a cadeia no Fusion Center.
+const STUFF_WARN  = parseInt(process.env.STUFFING_WARN_USERS  || '4', 10);
+const STUFF_BLOCK = parseInt(process.env.STUFFING_BLOCK_USERS || '7', 10);
+const stuffSeen = new Map();   // ip -> Map(username -> ts)
+function detectStuffing(ip, username) {
+  const now = Date.now();
+  const seen = stuffSeen.get(ip) || new Map();
+  for (const [u, t] of seen) if (now - t > 60000) seen.delete(u);
+  seen.set(username, now);
+  stuffSeen.set(ip, seen);
+  const users = seen.size;
+  if (users < STUFF_WARN) return null;
+  const blocked = users >= STUFF_BLOCK;
+  return {
+    blocked,
+    evt: { event_type: 'login', threat: 'credential_stuffing', client_ip: ip, username,
+           risk_score: Math.min(100, users * 12), blocked,
+           detail: `distinct_users=${users}/60s` },
+  };
+}
+
 module.exports = {
   sha256, logSecurity, clientIp, hitWindow, persistEvent,
-  detectScraping, detectTampering, detectCardTesting, detectVelocity, tracer,
+  detectScraping, detectTampering, detectCardTesting, detectVelocity, detectStuffing, tracer,
 };

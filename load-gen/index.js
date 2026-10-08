@@ -98,12 +98,35 @@ async function errorProbe() {
 
 const ATTACKER_UAS = ['curl/8.4.0', 'python-requests/2.31', 'Scrapy/2.11'];
 
+// Atores por tipo de ataque. Faixas de documentacao (RFC 5737), entao nada aqui
+// e IP real; o pais/cidade vem do lookup obs_lab_geo do app obs_lab_fusion.
+// Cada ataque tem seus PROPRIOS IPs: o detector de credential stuffing conta
+// usuarios distintos por IP, e um IP compartilhado com o brute force faria o
+// brute force sair como stuffing. Mudou aqui -> atualize obs_lab_geo.csv.
+const ACTORS = {
+  scraping:    ['203.0.113.66', '203.0.113.67', '203.0.113.68'],
+  tampering:   ['203.0.113.77', '203.0.113.78'],
+  cardTesting: ['203.0.113.88', '203.0.113.89', '203.0.113.90'],
+  velocity:    ['203.0.113.99', '203.0.113.100'],
+  bruteForce:  ['198.51.100.42', '198.51.100.43'],
+  // 8 IPs em rodizio, nao sorteio: o detector lembra os usuarios de cada IP por
+  // 60s, e um IP repetido antes disso ja comeca a rodada bloqueado - o acerto
+  // da lista nunca passaria. Um stuffing a cada ~15s -> mesmo IP a cada ~2 min.
+  stuffing:    ['198.51.100.60', '198.51.100.61', '198.51.100.62', '198.51.100.63',
+                '198.51.100.64', '198.51.100.65', '198.51.100.66', '198.51.100.67'],
+  ato:         ['203.0.113.200', '203.0.113.201'],
+};
+const xff = (pool) => ({ 'X-Forwarded-For': rand(pool) });
+let stuffTurn = 0;
+const nextStuffingIp = () => ACTORS.stuffing[stuffTurn++ % ACTORS.stuffing.length];
+
 async function fraudScraping() {
+  const ip = rand(ACTORS.scraping);
   for (let i = 0; i < 25; i++) {
     const start = Date.now();
     try {
       const r = await fetch(`${TARGET}/api/products`, {
-        headers: { 'User-Agent': rand(ATTACKER_UAS), 'X-Forwarded-For': '203.0.113.66' },
+        headers: { 'User-Agent': rand(ATTACKER_UAS), 'X-Forwarded-For': ip },
         signal: AbortSignal.timeout(8000),
       });
       record('fraud_scraping', r.status, Date.now() - start);
@@ -114,45 +137,73 @@ async function fraudTampering() {
   const r = await req('POST', '/api/checkout', {
     items: [{ productId: 'prod-003', qty: 1, price: 1.99 }],
     customerId: 'cust-fraud', paymentMethod: 'card',
-  }, { 'X-Forwarded-For': '203.0.113.77' });
+  }, xff(ACTORS.tampering));
   record('fraud_tampering', r.status, r.ms);
 }
 async function fraudCardTesting() {
   // preco REAL do item mais barato (2.99 < 5 = low value): com preco falso o
   // gateway classificaria como price_tampering e o card_testing nunca apareceria
+  const hdrs = xff(ACTORS.cardTesting);
   for (let i = 0; i < 12; i++) {
     const r = await req('POST', '/api/checkout', {
       items: [{ productId: 'prod-006', qty: 1, price: CATALOGUE['prod-006'] }],
       customerId: `cust-ct-${i}`, paymentMethod: 'card',
-    }, { 'X-Forwarded-For': '203.0.113.88' });
+    }, hdrs);
     record('fraud_card_testing', r.status, r.ms);
   }
 }
 async function fraudVelocity() {
+  const hdrs = xff(ACTORS.velocity);
   for (let i = 0; i < 15; i++) {
     const r = await req('POST', '/api/checkout', {
       items: [{ productId: 'prod-001', qty: 1, price: CATALOGUE['prod-001'] }],
       customerId: 'cust-velocity', paymentMethod: 'pix',
-    }, { 'X-Forwarded-For': '203.0.113.99' });
+    }, hdrs);
     record('fraud_velocity', r.status, r.ms);
   }
 }
 async function fraudBruteForce() {
   const user = rand(['alice', 'admin', 'bob']);
+  const hdrs = xff(ACTORS.bruteForce);
   for (let i = 0; i < 8; i++) {
-    const r = await req('POST', '/api/login', { username: user, password: `wrong${i}` },
-      { 'X-Forwarded-For': '198.51.100.42' });
+    const r = await req('POST', '/api/login', { username: user, password: `wrong${i}` }, hdrs);
     record('fraud_bruteforce', r.status, r.ms);
   }
 }
 async function fraudATO() {
   await req('POST', '/api/login', { username: 'bob', password: 'hunter2' }, { 'X-Forwarded-For': '192.0.2.10' });
   await sleep(500);
-  const r = await req('POST', '/api/login', { username: 'bob', password: 'hunter2' }, { 'X-Forwarded-For': '203.0.113.200' });
+  const r = await req('POST', '/api/login', { username: 'bob', password: 'hunter2' }, xff(ACTORS.ato));
   record('fraud_ato', r.status, r.ms);
 }
+// Credential stuffing: lista "vazada" com 8 pares, um so valido (alice) na 5a
+// posicao. O gateway avisa a partir de 4 usuarios distintos e bloqueia no 7o,
+// entao o acerto passa: login valido de IP novo (ATO) e compra com a conta
+// tomada - a cadeia completa que o Fusion Center liga pelo client_ip.
+const LEAKED = [
+  ['maria.souza', 'Mudar@123'], ['joao.lima', 'senha123'], ['ana.costa', 'Brasil2024'],
+  ['carlos.p', '12345678'], ['alice', 'alice123'], ['pedro.r', 'qwerty'],
+  ['julia.m', 'Julia@2023'], ['rafael.t', 'abc123'],
+];
+async function fraudStuffing() {
+  // dono da conta entra de casa antes: sem last_login_ip o acerto da lista nao
+  // e reconhecido como ATO (o gateway so compara com o ultimo IP)
+  await req('POST', '/api/login', { username: 'alice', password: 'alice123' }, { 'X-Forwarded-For': '192.0.2.11' });
+  const hdrs = { 'X-Forwarded-For': nextStuffingIp() };
+  for (const [username, password] of LEAKED) {
+    const r = await req('POST', '/api/login', { username, password }, hdrs);
+    record('fraud_stuffing', r.status, r.ms);
+    if (r.status === 200) {
+      const c = await req('POST', '/api/checkout', {
+        items: [{ productId: 'prod-003', qty: 1, price: CATALOGUE['prod-003'] }],
+        customerId: 'cust-alice', paymentMethod: 'card',
+      }, hdrs);
+      record('fraud_stuffing_checkout', c.status, c.ms);
+    }
+  }
+}
 async function fraudRun() {
-  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO];
+  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO, fraudStuffing];
   await rand(attacks)();
 }
 

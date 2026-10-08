@@ -1,6 +1,6 @@
 <form version="1.1" theme="dark">
   <label>Fraude - obs-lab</label>
-  <description>Os 6 fluxos de fraude do lab, do volume ao evento cru. Fonte: logs do gateway via HEC (index=lab).</description>
+  <description>Os 7 fluxos de fraude do lab, do volume ao evento cru. Fonte: logs do gateway via HEC (index=lab).</description>
 
   <init>
     <!-- sem isso o painel de eventos crus quebra antes do primeiro clique na tabela de risco -->
@@ -20,6 +20,7 @@
       <choice value="threat=*">Todas</choice>
       <choice value="threat=brute_force">Brute force</choice>
       <choice value="threat=account_takeover">Account takeover</choice>
+      <choice value="threat=credential_stuffing">Credential stuffing</choice>
       <choice value="threat=price_tampering">Price tampering</choice>
       <choice value="threat=card_testing">Card testing</choice>
       <choice value="threat=velocity_abuse">Velocity abuse</choice>
@@ -133,7 +134,7 @@
       <table>
         <title>Contas sob ataque</title>
         <search>
-          <query>`obs_lab_security` (threat=brute_force OR threat=account_takeover OR outcome=fail) username=* | stats count as eventos, dc(client_ip) as ips, values(threat) as ameacas, max(risk_score) as risco by username | sort - risco | head 10</query>
+          <query>`obs_lab_security` (threat=brute_force OR threat=credential_stuffing OR threat=account_takeover OR outcome=fail) username=* | stats count as eventos, dc(client_ip) as ips, values(threat) as ameacas, max(risk_score) as risco by username | sort - risco | head 10</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>

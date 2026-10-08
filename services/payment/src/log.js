@@ -64,6 +64,10 @@ function httpMiddleware() {
         http_method: req.method,
         http_path: req.path,
         http_status: res.statusCode,
+        // origem do request: e o que liga o access log ao evento de seguranca
+        // do mesmo IP (credential stuffing -> login valido -> checkout).
+        client_ip: (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown')
+          .split(',')[0].trim(),
         duration_ms: Math.round(ms),
       }, spanCtx);
     });

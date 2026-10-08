@@ -1,0 +1,8 @@
+threat,dominio,mitre_id,mitre_tecnica,mitre_tatica,controle_pci,controle_lgpd
+brute_force,cyber,T1110.001,Password Guessing,Credential Access,PCI 8.3.4 bloqueio por tentativas,LGPD art.46 seguranca
+credential_stuffing,cyber,T1110.004,Credential Stuffing,Credential Access,PCI 8.4.2 MFA,LGPD art.46 seguranca
+account_takeover,fraude,T1078,Valid Accounts,Initial Access,PCI 8.4.2 MFA,LGPD art.48 comunicar incidente
+price_tampering,fraude,T1565.002,Transmitted Data Manipulation,Impact,PCI 6.2.4 logica de negocio,nao se aplica
+card_testing,fraude,T1657,Financial Theft,Impact,PCI 10.4.1 revisao de logs,nao se aplica
+velocity_abuse,fraude,T1657,Financial Theft,Impact,PCI 10.4.1 revisao de logs,nao se aplica
+bot_scraping,cyber,T1119,Automated Collection,Collection,PCI 6.4.2 protecao de app web,nao se aplica

@@ -153,6 +153,90 @@
     </panel>
   </row>
 
+  <!-- ===================== SYNTHETICS (o11y) ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">EXPERIENCIA SINTETICA - Splunk Synthetics (o11y)</h2>
+        <p style="color:#888">Os testes OBS-LAB-* rodam no Observability Cloud a cada 2 min, de 4 locations AWS. Vem pelo comando | sim do Infrastructure Monitoring Add-on: consulta ao vivo, nada indexado. ThousandEyes acima mede a rede; aqui e a resposta HTTP vista de fora.</p>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <single>
+        <title>Uptime medio dos testes</title>
+        <search>
+          <query>`obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unit">%</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0xdc4e41","0xf8be34","0x53a051"]</option>
+        <option name="rangeValues">[90,98]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Execucoes com falha</title>
+        <search>
+          <query>`obs_lab_synth_failed` | stats sum(valor) as falhas</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,5]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <chart>
+        <title>Uptime por teste (%)</title>
+        <search>
+          <query>`obs_lab_synth_uptime` | timechart span=5m avg(valor) by test</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisY.minimumNumber">0</option>
+        <option name="charting.axisY.maximumNumber">100</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Duracao da execucao por location (ms)</title>
+        <search>
+          <query>`obs_lab_synth_duration` | timechart span=5m avg(valor) by location</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Teste x location - resumo do periodo</title>
+        <search>
+          <query>`obs_lab_synth_uptime` | stats avg(valor) as uptime by test, location | join type=left test, location [`obs_lab_synth_duration` | stats avg(valor) as duracao_ms by test, location] | join type=left test, location [`obs_lab_synth_failed` | stats sum(valor) as falhas by test, location] | fillnull value=0 falhas | eval uptime=round(uptime,1), duracao_ms=round(duracao_ms,0) | sort uptime</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
   <!-- ===================== APLICACAO ===================== -->
   <row>
     <panel>

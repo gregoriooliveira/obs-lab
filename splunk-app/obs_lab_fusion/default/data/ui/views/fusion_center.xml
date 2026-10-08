@@ -1,0 +1,574 @@
+<dashboard version="2" theme="dark">
+  <label>Fusion Center - obs-lab</label>
+  <description>Cyber, fraude, risco e compliance numa visao so, por entidade.</description>
+  <definition><![CDATA[
+{
+  "title": "Fusion Center - obs-lab",
+  "description": "Cyber, fraude, risco e compliance por entidade. Fontes: index=lab (gateway via HEC), index=te (ThousandEyes), Synthetics via | sim. Enriquecimento: lookups obs_lab_geo e obs_lab_threat.",
+  "dataSources": {
+    "ds_risco": {
+      "type": "ds.search",
+      "name": "ds_risco",
+      "options": {
+        "query": "`obs_lab_fraud` | stats sum(risk_score) as risco"
+      }
+    },
+    "ds_ips": {
+      "type": "ds.search",
+      "name": "ds_ips",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | where ator!=\"cliente\" | stats dc(client_ip) as ips"
+      }
+    },
+    "ds_usd": {
+      "type": "ds.search",
+      "name": "ds_usd",
+      "options": {
+        "query": "`obs_lab_fraud` (threat=price_tampering OR threat=card_testing) | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), true(), 0) | stats sum(usd) as usd | eval usd=round(usd,2)"
+      }
+    },
+    "ds_contas": {
+      "type": "ds.search",
+      "name": "ds_contas",
+      "options": {
+        "query": "`obs_lab_fraud` (threat=account_takeover OR threat=credential_stuffing OR threat=brute_force) username=* | stats dc(username) as contas"
+      }
+    },
+    "ds_bloqueio": {
+      "type": "ds.search",
+      "name": "ds_bloqueio",
+      "options": {
+        "query": "`obs_lab_fraud` | stats count(eval(blocked=\"true\")) as b, count as t | eval pct=round(b*100/t,1) | fields pct"
+      }
+    },
+    "ds_te": {
+      "type": "ds.search",
+      "name": "ds_te",
+      "options": {
+        "query": "`obs_lab_te` | rename \"metric_name:http.server.request.availability\" as d | where isnotnull(d) | stats avg(d) as disp | eval disp=round(disp,1)"
+      }
+    },
+    "ds_synth": {
+      "type": "ds.search",
+      "name": "ds_synth",
+      "options": {
+        "query": "`obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)"
+      }
+    },
+    "ds_mapa": {
+      "type": "ds.search",
+      "name": "ds_mapa",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | where ator!=\"cliente\" AND isnotnull(lat) | stats sum(risk_score) as risco, count as eventos, values(threat) as ameacas by pais, cidade, lat, lon | sort - risco"
+      }
+    },
+    "ds_sankey": {
+      "type": "ds.search",
+      "name": "ds_sankey",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | eval tecnica=mitre_id.\" \".mitre_tecnica, rota=case(event_type=\"login\",\"POST /api/login\", event_type=\"catalogue_access\",\"GET /api/products\", true(),\"POST /api/checkout\"), desfecho=if(blocked=\"true\",\"Bloqueado\",\"Passou\") | eval par=mvappend(pais.\"#\".tecnica, tecnica.\"#\".rota, rota.\"#\".desfecho) | mvexpand par | rex field=par \"^(?<source>[^#]+)#(?<target>.+)$\" | stats count as value by source, target"
+      }
+    },
+    "ds_funil": {
+      "type": "ds.search",
+      "name": "ds_funil",
+      "options": {
+        "query": "`obs_lab_app` ((logger=security (threat=credential_stuffing OR threat=brute_force OR threat=account_takeover)) OR (logger=http service=gateway-service http_path=\"/api/checkout\" http_status=201)) | eventstats count(eval(threat=\"credential_stuffing\" OR threat=\"brute_force\")) as ataque by client_ip | where ataque>0 | eval etapa=case(threat=\"account_takeover\",\"2. Conta tomada\", logger=\"http\",\"3. Compra aprovada\", true(),\"1. Credencial testada\") | stats dc(client_ip) as ips by etapa | sort etapa"
+      }
+    },
+    "ds_mitre": {
+      "type": "ds.search",
+      "name": "ds_mitre",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | stats count as eventos, dc(client_ip) as ips by mitre_tatica, mitre_id, mitre_tecnica, dominio | sort mitre_tatica, - eventos"
+      }
+    },
+    "ds_casos": {
+      "type": "ds.search",
+      "name": "ds_casos",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), true(), 0) | stats sum(risk_score) as risco, dc(threat) as vetores, values(dominio) as dominios, values(mitre_id) as mitre, values(controle_pci) as pci, values(username) as contas, sum(usd) as usd_em_risco, count(eval(blocked=\"true\")) as bloqueados, count as eventos, latest(_time) as ultimo by client_ip, pais, cidade, ator | join type=left client_ip [search `obs_lab_http` service=gateway-service http_path=\"/api/checkout\" http_status=201 | stats count as compras_aprovadas by client_ip] | fillnull value=0 compras_aprovadas | eval bloqueio_pct=round(bloqueados*100/eventos,0), usd_em_risco=round(usd_em_risco,2), ultimo=strftime(ultimo,\"%H:%M:%S\"), severidade=case(vetores>=2 AND risco>300,\"CRITICA\", risco>300,\"ALTA\", risco>100,\"MEDIA\", true(),\"BAIXA\") | sort - risco | head 25 | table severidade, client_ip, pais, cidade, ator, dominios, mitre, risco, vetores, contas, compras_aprovadas, usd_em_risco, bloqueio_pct, pci, ultimo"
+      }
+    },
+    "ds_grafo": {
+      "type": "ds.search",
+      "name": "ds_grafo",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | eval conta=coalesce(username,\"(sem conta)\"), tecnica=mitre_id.\" \".mitre_tecnica | stats count by pais, client_ip, tecnica, conta | sort - count | head 120 | fields pais, client_ip, tecnica, conta"
+      }
+    },
+    "ds_corr": {
+      "type": "ds.search",
+      "name": "ds_corr",
+      "options": {
+        "query": "`obs_lab_app` service=gateway-service (logger=security OR logger=http) | eval st=tonumber(http_status) | timechart span=1m count(eval(isnotnull(threat))) as ataques, count(eval(st>=500)) as erros_5xx, count(eval(http_path=\"/api/checkout\" AND st<300)) as checkouts_ok"
+      }
+    },
+    "ds_compliance": {
+      "type": "ds.search",
+      "name": "ds_compliance",
+      "options": {
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | stats count as eventos, count(eval(blocked=\"true\")) as bloqueados, dc(client_ip) as ips, values(threat) as ameacas by controle_pci, controle_lgpd | eval sem_bloqueio=eventos-bloqueados | sort - sem_bloqueio | table controle_pci, controle_lgpd, ameacas, eventos, sem_bloqueio, ips"
+      }
+    }
+  },
+  "visualizations": {
+    "viz_titulo": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "## FUSION CENTER - obs-lab\nCyber, fraude, risco e compliance numa visao so. A unidade e a **entidade** (IP / conta): o mesmo ataque aparece como tecnica MITRE, perda financeira e controle PCI/LGPD sob pressao.",
+        "fontColor": "#e1e6eb"
+      }
+    },
+    "viz_k_risco": {
+      "type": "splunk.singlevalue",
+      "title": "Risco acumulado",
+      "dataSources": {
+        "primary": "ds_risco"
+      },
+      "options": {
+        "majorColor": "> majorValue | rangeValue(cores)"
+      },
+      "context": {
+        "cores": [
+          {
+            "to": 5000,
+            "value": "#53a051"
+          },
+          {
+            "from": 5000,
+            "to": 20000,
+            "value": "#f8be34"
+          },
+          {
+            "from": 20000,
+            "value": "#dc4e41"
+          }
+        ]
+      }
+    },
+    "viz_k_ips": {
+      "type": "splunk.singlevalue",
+      "title": "IPs hostis",
+      "dataSources": {
+        "primary": "ds_ips"
+      },
+      "options": {}
+    },
+    "viz_k_contas": {
+      "type": "splunk.singlevalue",
+      "title": "Contas atacadas",
+      "dataSources": {
+        "primary": "ds_contas"
+      },
+      "options": {}
+    },
+    "viz_k_usd": {
+      "type": "splunk.singlevalue",
+      "title": "Valor em risco medido",
+      "dataSources": {
+        "primary": "ds_usd"
+      },
+      "options": {
+        "unit": "USD",
+        "unitPosition": "before"
+      }
+    },
+    "viz_k_bloq": {
+      "type": "splunk.singlevalue",
+      "title": "Taxa de bloqueio",
+      "dataSources": {
+        "primary": "ds_bloqueio"
+      },
+      "options": {
+        "unit": "%",
+        "majorColor": "> majorValue | rangeValue(cores)"
+      },
+      "context": {
+        "cores": [
+          {
+            "to": 50,
+            "value": "#dc4e41"
+          },
+          {
+            "from": 50,
+            "to": 80,
+            "value": "#f8be34"
+          },
+          {
+            "from": 80,
+            "value": "#53a051"
+          }
+        ]
+      }
+    },
+    "viz_k_te": {
+      "type": "splunk.singlevalue",
+      "title": "Canal - ThousandEyes",
+      "dataSources": {
+        "primary": "ds_te"
+      },
+      "options": {
+        "unit": "%",
+        "majorColor": "> majorValue | rangeValue(cores)"
+      },
+      "context": {
+        "cores": [
+          {
+            "to": 90,
+            "value": "#dc4e41"
+          },
+          {
+            "from": 90,
+            "to": 98,
+            "value": "#f8be34"
+          },
+          {
+            "from": 98,
+            "value": "#53a051"
+          }
+        ]
+      }
+    },
+    "viz_k_synth": {
+      "type": "splunk.singlevalue",
+      "title": "Canal - Synthetics",
+      "dataSources": {
+        "primary": "ds_synth"
+      },
+      "options": {
+        "unit": "%",
+        "majorColor": "> majorValue | rangeValue(cores)"
+      },
+      "context": {
+        "cores": [
+          {
+            "to": 90,
+            "value": "#dc4e41"
+          },
+          {
+            "from": 90,
+            "to": 98,
+            "value": "#f8be34"
+          },
+          {
+            "from": 98,
+            "value": "#53a051"
+          }
+        ]
+      }
+    },
+    "viz_mapa": {
+      "type": "splunk.map",
+      "title": "Origem dos ataques (tamanho = risco)",
+      "dataSources": {
+        "primary": "ds_mapa"
+      },
+      "options": {
+        "center": [
+          20,
+          0
+        ],
+        "zoom": 1.3,
+        "layers": [
+          {
+            "type": "bubble",
+            "latitude": "> primary | seriesByName('lat')",
+            "longitude": "> primary | seriesByName('lon')",
+            "bubbleSize": "> primary | seriesByName('risco')"
+          }
+        ]
+      }
+    },
+    "viz_funil": {
+      "type": "splunk.bar",
+      "title": "Roubo de credencial - IPs em cada etapa",
+      "dataSources": {
+        "primary": "ds_funil"
+      },
+      "options": {
+        "legendDisplay": "off",
+        "dataValuesDisplay": "all"
+      }
+    },
+    "viz_mitre": {
+      "type": "splunk.table",
+      "title": "MITRE ATT&CK observado",
+      "dataSources": {
+        "primary": "ds_mitre"
+      },
+      "options": {
+        "count": 10
+      }
+    },
+    "viz_sankey": {
+      "type": "splunk.sankey",
+      "title": "Fluxo do ataque: origem > tecnica > rota > desfecho",
+      "dataSources": {
+        "primary": "ds_sankey"
+      },
+      "options": {}
+    },
+    "viz_casos": {
+      "type": "splunk.table",
+      "title": "Casos por entidade - cyber + fraude + risco + compliance numa linha",
+      "dataSources": {
+        "primary": "ds_casos"
+      },
+      "options": {
+        "count": 15,
+        "columnFormat": {
+          "severidade": {
+            "rowBackgroundColors": "> table | seriesByName(\"severidade\") | matchValue(sev)"
+          }
+        }
+      },
+      "context": {
+        "sev": [
+          {
+            "match": "CRITICA",
+            "value": "#dc4e41"
+          },
+          {
+            "match": "ALTA",
+            "value": "#ec9960"
+          },
+          {
+            "match": "MEDIA",
+            "value": "#f8be34"
+          },
+          {
+            "match": "BAIXA",
+            "value": "#53a051"
+          }
+        ]
+      }
+    },
+    "viz_grafo": {
+      "type": "splunk.linkgraph",
+      "title": "Cadeia: pais > IP > tecnica > conta",
+      "dataSources": {
+        "primary": "ds_grafo"
+      },
+      "options": {}
+    },
+    "viz_corr": {
+      "type": "splunk.line",
+      "title": "Ataque x saude do negocio (por minuto)",
+      "dataSources": {
+        "primary": "ds_corr"
+      },
+      "options": {
+        "legendDisplay": "bottom"
+      }
+    },
+    "viz_compliance": {
+      "type": "splunk.table",
+      "title": "Controles sob pressao (PCI DSS 4.0 / LGPD)",
+      "dataSources": {
+        "primary": "ds_compliance"
+      },
+      "options": {
+        "count": 8
+      }
+    }
+  },
+  "inputs": {
+    "input_tempo": {
+      "type": "input.timerange",
+      "title": "Periodo",
+      "options": {
+        "token": "tempo",
+        "defaultValue": "-60m@m,now"
+      }
+    }
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": {
+            "earliest": "$tempo.earliest$",
+            "latest": "$tempo.latest$"
+          }
+        }
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": {
+      "width": 1600,
+      "height": 2100,
+      "display": "auto-scale"
+    },
+    "structure": [
+      {
+        "item": "viz_titulo",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 80
+        }
+      },
+      {
+        "item": "viz_k_risco",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_ips",
+        "type": "block",
+        "position": {
+          "x": 230,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_contas",
+        "type": "block",
+        "position": {
+          "x": 460,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_usd",
+        "type": "block",
+        "position": {
+          "x": 690,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_bloq",
+        "type": "block",
+        "position": {
+          "x": 920,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_te",
+        "type": "block",
+        "position": {
+          "x": 1150,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_k_synth",
+        "type": "block",
+        "position": {
+          "x": 1380,
+          "y": 90,
+          "w": 220,
+          "h": 110
+        }
+      },
+      {
+        "item": "viz_mapa",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 210,
+          "w": 960,
+          "h": 470
+        }
+      },
+      {
+        "item": "viz_funil",
+        "type": "block",
+        "position": {
+          "x": 970,
+          "y": 210,
+          "w": 630,
+          "h": 220
+        }
+      },
+      {
+        "item": "viz_mitre",
+        "type": "block",
+        "position": {
+          "x": 970,
+          "y": 440,
+          "w": 630,
+          "h": 240
+        }
+      },
+      {
+        "item": "viz_sankey",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 690,
+          "w": 1600,
+          "h": 430
+        }
+      },
+      {
+        "item": "viz_casos",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 1130,
+          "w": 1600,
+          "h": 480
+        }
+      },
+      {
+        "item": "viz_grafo",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 1620,
+          "w": 800,
+          "h": 470
+        }
+      },
+      {
+        "item": "viz_corr",
+        "type": "block",
+        "position": {
+          "x": 810,
+          "y": 1620,
+          "w": 790,
+          "h": 230
+        }
+      },
+      {
+        "item": "viz_compliance",
+        "type": "block",
+        "position": {
+          "x": 810,
+          "y": 1860,
+          "w": 790,
+          "h": 230
+        }
+      }
+    ],
+    "globalInputs": [
+      "input_tempo"
+    ]
+  }
+}
+  ]]></definition>
+  <meta type="hiddenElements"><![CDATA[{"hideEdit": false, "hideOpenInSearch": false, "hideExport": false}]]></meta>
+</dashboard>
