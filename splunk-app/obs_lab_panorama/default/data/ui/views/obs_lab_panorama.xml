@@ -168,7 +168,7 @@
       <single>
         <title>Uptime medio dos testes</title>
         <search>
-          <query>`obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)</query>
+          <query>| `obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -184,7 +184,7 @@
       <single>
         <title>Execucoes com falha</title>
         <search>
-          <query>`obs_lab_synth_failed` | stats sum(valor) as falhas</query>
+          <query>| `obs_lab_synth_failed` | stats count, sum(valor) as falhas | eval falhas=coalesce(falhas,0) | fields falhas</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -199,7 +199,7 @@
       <chart>
         <title>Uptime por teste (%)</title>
         <search>
-          <query>`obs_lab_synth_uptime` | timechart span=10m avg(valor) by test</query>
+          <query>| `obs_lab_synth_uptime` | timechart span=10m avg(valor) by test</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -216,7 +216,7 @@
       <chart>
         <title>Duracao da execucao por location (ms)</title>
         <search>
-          <query>`obs_lab_synth_duration` | timechart span=10m avg(valor) by location</query>
+          <query>| `obs_lab_synth_duration` | timechart span=10m avg(valor) by location</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -228,7 +228,7 @@
       <table>
         <title>Teste x location - resumo do periodo</title>
         <search>
-          <query>`obs_lab_synth_uptime` | stats avg(valor) as uptime by test, location | join type=left test, location [`obs_lab_synth_duration` | stats avg(valor) as duracao_ms by test, location] | join type=left test, location [`obs_lab_synth_failed` | stats sum(valor) as falhas by test, location] | fillnull value=0 falhas | eval uptime=round(uptime,1), duracao_ms=round(duracao_ms,0) | sort uptime</query>
+          <query>| `obs_lab_synth_uptime` | stats avg(valor) as uptime by test, location | join type=left test, location [| `obs_lab_synth_duration` | stats avg(valor) as duracao_ms by test, location] | join type=left test, location [| `obs_lab_synth_failed` | stats sum(valor) as falhas by test, location] | fillnull value=0 falhas | eval uptime=round(uptime,1), duracao_ms=round(duracao_ms,0) | sort uptime</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>

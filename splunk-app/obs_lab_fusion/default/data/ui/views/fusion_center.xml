@@ -52,7 +52,7 @@
       "type": "ds.search",
       "name": "ds_synth",
       "options": {
-        "query": "`obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)"
+        "query": "| `obs_lab_synth_uptime` | stats avg(valor) as uptime | eval uptime=round(uptime,1)"
       }
     },
     "ds_mapa": {
