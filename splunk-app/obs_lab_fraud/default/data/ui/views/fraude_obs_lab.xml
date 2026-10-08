@@ -181,7 +181,7 @@
       <chart>
         <title>Sinais que mais pesaram (pontos somados)</title>
         <search>
-          <query>`obs_lab_risk` decision!=approve | rename rules{} as regra | mvexpand regra | rex field=regra "^(?&lt;sinal&gt;[a-z_]+)[^:]*:\+(?&lt;pts&gt;\d+)$" | stats sum(pts) as pontos by sinal | sort - pontos</query>
+          <query>`obs_lab_risk` decision!=approve | rename rules{} as regra | mvexpand regra | rex field=regra "^(?&lt;sinal&gt;[^=:]+)[^:]*:\+(?&lt;pts&gt;\d+)$" | stats sum(pts) as pontos by sinal | sort - pontos</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
