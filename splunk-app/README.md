@@ -50,6 +50,17 @@ correlação em vez de alerta isolado.
 Os disparos aparecem em **Activity → Triggered Alerts** (`alert.track = 1`), que
 é o mais perto de um notable que Splunk Enterprise puro entrega.
 
+## CIM
+
+`props.conf`, `eventtypes.conf` e `tags.conf` mapeiam os logs para os data
+models **Authentication** (`tag=authentication`, `action=success|failure`,
+`user`, `src`) e **Web** (`tag=web`, `status`, `uri_path`, `dest`). É o que o
+Security Essentials procura para as detecções prontas acharem campo.
+
+```
+tag=authentication index=lab | stats count by action, user
+```
+
 ## Se os painéis vierem vazios
 
 O `index` e o `sourcetype` estão fixos na macro `obs_lab_security`. Confira o que
