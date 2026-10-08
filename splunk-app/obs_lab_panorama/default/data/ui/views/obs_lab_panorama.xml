@@ -158,7 +158,7 @@
     <panel>
       <html>
         <h2 style="color:#dc4e41;margin:4px 0">EXPERIENCIA SINTETICA - Splunk Synthetics (o11y)</h2>
-        <p style="color:#888">Os testes OBS-LAB-* rodam no Observability Cloud a cada 2 min, de 4 locations AWS. Vem pelo comando | sim do Infrastructure Monitoring Add-on: consulta ao vivo, nada indexado. ThousandEyes acima mede a rede; aqui e a resposta HTTP vista de fora.</p>
+        <p style="color:#888">Os testes OBS-LAB-* rodam no Observability Cloud a cada 2 min, de 4 locations AWS. Vem pelo comando | sim do Infrastructure Monitoring Add-on: consulta ao vivo, nada indexado, em pontos de 10 min (a org devolve essa resolucao). ThousandEyes acima mede a rede; aqui e a resposta HTTP vista de fora.</p>
       </html>
     </panel>
   </row>
@@ -199,7 +199,7 @@
       <chart>
         <title>Uptime por teste (%)</title>
         <search>
-          <query>`obs_lab_synth_uptime` | timechart span=5m avg(valor) by test</query>
+          <query>`obs_lab_synth_uptime` | timechart span=10m avg(valor) by test</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -216,7 +216,7 @@
       <chart>
         <title>Duracao da execucao por location (ms)</title>
         <search>
-          <query>`obs_lab_synth_duration` | timechart span=5m avg(valor) by location</query>
+          <query>`obs_lab_synth_duration` | timechart span=10m avg(valor) by location</query>
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
@@ -327,7 +327,7 @@
     <panel>
       <html>
         <h2 style="color:#dc4e41;margin:4px 0">APLICACAO - METRICAS (OTLP via collector)</h2>
-        <p style="color:#888">As MESMAS metricas que a aplicacao manda pro Observability Cloud, agora tambem no Splunk. Counters OTLP sao cumulativos e o exporter splunk_hec nao converte pra delta - por isso rate(), nunca sum().</p>
+        <p style="color:#888">As MESMAS metricas que vao pro Observability Cloud, agora tambem no Splunk. Counter OTLP e cumulativo: o BY do rate() tem que conter TODAS as dimensoes que separam serie, senao o mstats le troca de serie como reset e infla o numero.</p>
       </html>
     </panel>
   </row>
@@ -342,6 +342,7 @@
           <latest>$tempo.latest$</latest>
         </search>
         <option name="charting.chart">area</option>
+        <option name="charting.chart.stackMode">stacked</option>
         <option name="charting.legend.placement">bottom</option>
       </chart>
     </panel>
