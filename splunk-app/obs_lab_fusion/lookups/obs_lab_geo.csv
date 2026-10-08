@@ -27,3 +27,6 @@ cidr,pais,cidade,lat,lon,ator
 198.51.100.67/32,Bulgaria,Sofia,42.70,23.32,atacante
 203.0.113.200/32,Portugal,Lisboa,38.72,-9.14,atacante
 203.0.113.201/32,Africa do Sul,Joanesburgo,-26.20,28.05,atacante
+203.0.113.150/32,Tailandia,Bangkok,13.75,100.50,atacante
+203.0.113.151/32,Filipinas,Manila,14.60,120.98,atacante
+203.0.113.152/32,Egito,Cairo,30.04,31.24,atacante

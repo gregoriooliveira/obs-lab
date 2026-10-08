@@ -1,6 +1,6 @@
 <form version="1.1" theme="dark">
   <label>Fraude - obs-lab</label>
-  <description>Os 7 fluxos de fraude do lab, do volume ao evento cru. Fonte: logs do gateway via HEC (index=lab).</description>
+  <description>Os 8 fluxos de fraude do lab, do volume ao evento cru. Fonte: logs do gateway via HEC (index=lab).</description>
 
   <init>
     <!-- sem isso o painel de eventos crus quebra antes do primeiro clique na tabela de risco -->
@@ -21,6 +21,7 @@
       <choice value="threat=brute_force">Brute force</choice>
       <choice value="threat=account_takeover">Account takeover</choice>
       <choice value="threat=credential_stuffing">Credential stuffing</choice>
+      <choice value="threat=card_cycling">Card cycling (motor de risco)</choice>
       <choice value="threat=price_tampering">Price tampering</choice>
       <choice value="threat=card_testing">Card testing</choice>
       <choice value="threat=velocity_abuse">Velocity abuse</choice>
@@ -148,6 +149,62 @@
           <earliest>$tempo.earliest$</earliest>
           <latest>$tempo.latest$</latest>
         </search>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">MOTOR DE RISCO DO CHECKOUT</h2>
+        <p style="color:#888">Cada checkout recebe um score somando sinais do dispositivo (cartoes e contas distintas, rajada, aparelho novo na conta, valor alto, bloqueios anteriores). Abaixo de 40 aprova, de 40 a 69 pede 3DS, a partir de 70 bloqueia.</p>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <chart>
+        <title>Decisoes do motor no tempo</title>
+        <search>
+          <query>`obs_lab_risk` | timechart span=1m count by decision</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.fieldColors">{"approve":0x53A051,"challenge":0xF8BE34,"block":0xDC4E41}</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Sinais que mais pesaram (pontos somados)</title>
+        <search>
+          <query>`obs_lab_risk` decision!=approve | rename rules{} as regra | mvexpand regra | rex field=regra "^(?&lt;sinal&gt;[a-z_]+)[^:]*:\+(?&lt;pts&gt;\d+)$" | stats sum(pts) as pontos by sinal | sort - pontos</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="charting.chart">bar</option>
+        <option name="charting.legend.placement">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Dispositivos com varios cartoes - do primeiro aprovado ao bloqueio</title>
+        <search>
+          <query>`obs_lab_risk` | stats dc(card_fp) as cartoes, dc(username) as contas, max(risk_score) as score_max, count(eval(decision="approve")) as aprovadas, count(eval(decision="challenge")) as desafio_3ds, count(eval(decision="block")) as bloqueadas, sum(eval(if(decision="approve",amount,0))) as usd_aprovado, values(client_ip) as ips by device_id | where cartoes&gt;=3 | eval usd_aprovado=round(usd_aprovado,2) | sort - score_max | head 20</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color" field="score_max">
+          <colorPalette type="list">[#53A051,#F8BE34,#DC4E41]</colorPalette>
+          <scale type="threshold">40,70</scale>
+        </format>
       </table>
     </panel>
   </row>

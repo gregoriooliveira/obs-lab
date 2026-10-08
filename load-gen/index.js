@@ -27,12 +27,23 @@ const METHODS  = ['card','pix','boleto'];
 // velocity_abuse - o checkout legitimo virava 429 e orders/payment ficavam sem
 // trafego. Com 100 usuarios a taxa por usuario fica ~2 ordens de grandeza
 // abaixo dos thresholds, com folga ate VUs=30.
-const USERS = Array.from({ length: 100 }, (_, i) => ({
-  ip: `198.18.${Math.floor(i / 250)}.${10 + (i % 250)}`,
-  customerId: `cust-${String(i + 1).padStart(3, '0')}`,
-}));
+// Cada cliente tem um aparelho (X-Device-Id) e um cartao proprios: e o que o
+// motor de risco do gateway usa pra distinguir cliente normal de uma maquina
+// testando varios cartoes.
+const USERS = Array.from({ length: 100 }, (_, i) => {
+  const n = String(i + 1).padStart(3, '0');
+  return {
+    ip: `198.18.${Math.floor(i / 250)}.${10 + (i % 250)}`,
+    customerId: `cust-${n}`,
+    device: `dev-${n}`,
+    card: `card-${n}`,
+  };
+});
 const pickUser = () => USERS[Math.floor(Math.random() * USERS.length)];
-const asUser = (u) => ({ 'X-Forwarded-For': (u || pickUser()).ip });
+const asUser = (u) => {
+  const x = u || pickUser();
+  return { 'X-Forwarded-For': x.ip, 'X-Device-Id': x.device };
+};
 
 const stats = { req: 0, ok: 0, err: 0, ms: 0, byJourney: {} };
 function record(j, status, ms) {
@@ -85,8 +96,10 @@ async function checkout() {
     const productId = rand(PRODUCTS);
     return { productId, qty: rand([1,1,2]), price: CATALOGUE[productId] };
   });
+  const paymentMethod = rand(METHODS);
   const r = await req('POST', '/api/checkout', {
-    items, customerId: user.customerId, paymentMethod: rand(METHODS),
+    items, customerId: user.customerId, paymentMethod,
+    ...(paymentMethod === 'card' ? { cardFingerprint: user.card } : {}),
   }, hdrs);
   record('checkout', r.status, r.ms);
 }
@@ -115,6 +128,7 @@ const ACTORS = {
   stuffing:    ['198.51.100.60', '198.51.100.61', '198.51.100.62', '198.51.100.63',
                 '198.51.100.64', '198.51.100.65', '198.51.100.66', '198.51.100.67'],
   ato:         ['203.0.113.200', '203.0.113.201'],
+  cardCycling: ['203.0.113.150', '203.0.113.151', '203.0.113.152'],
 };
 const xff = (pool) => ({ 'X-Forwarded-For': rand(pool) });
 let stuffTurn = 0;
@@ -204,8 +218,26 @@ async function fraudStuffing() {
     }
   }
 }
+// Card cycling: UMA maquina tenta comprar com 8 cartoes roubados, revezando 4
+// contas de clientes reais, em segundos. Nenhum detector isolado pega (valor
+// normal, menos de 10 pedidos por conta), mas o motor de risco soma os sinais:
+// 1-2 aprova, 3-4 pede 3DS (score 55), 5+ bloqueia (70+). Aparelho novo a cada
+// rodada pra a progressao aprovar -> desafiar -> bloquear aparecer inteira.
+async function fraudCardCycling() {
+  const device = `dev-farm-${Math.random().toString(36).slice(2, 8)}`;
+  const hdrs = { ...xff(ACTORS.cardCycling), 'X-Device-Id': device };
+  const victims = [rand(USERS), rand(USERS), rand(USERS), rand(USERS)];
+  for (let i = 0; i < 8; i++) {
+    const r = await req('POST', '/api/checkout', {
+      items: [{ productId: 'prod-005', qty: 1, price: CATALOGUE['prod-005'] }],
+      customerId: victims[i % victims.length].customerId, paymentMethod: 'card',
+      cardFingerprint: `card-stolen-${device}-${i}`,
+    }, hdrs);
+    record('fraud_card_cycling', r.status, r.ms);
+  }
+}
 async function fraudRun() {
-  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO, fraudStuffing];
+  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO, fraudStuffing, fraudCardCycling];
   await rand(attacks)();
 }
 

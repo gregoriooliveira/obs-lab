@@ -1,6 +1,6 @@
 # obs_lab_fraud — app de detecção de fraude para Splunk Enterprise
 
-Detecta os 7 fluxos de fraude que o gateway do lab gera, usando só Splunk
+Detecta os 8 fluxos de fraude que o gateway do lab gera, usando só Splunk
 Enterprise: **sem Enterprise Security, sem Security Essentials e sem KVStore**.
 
 Isso não é uma limitação de gosto. O Splunk do lab roda num Xeon E7-4870
@@ -26,7 +26,7 @@ Depois: **Apps → obs-lab Fraude → Fraude - obs-lab**.
 |---|---|
 | `macros.conf` | `obs_lab_security` e `obs_lab_fraud` — a base de todas as buscas |
 | `props.conf` | extração JSON do sourcetype `obs-lab:container` |
-| `savedsearches.conf` | 7 detecções + 1 de risco acumulado, todas agendadas |
+| `savedsearches.conf` | 8 detecções + 1 de risco acumulado, todas agendadas |
 | `data/ui/views/fraude_obs_lab.xml` | dashboard com drilldown por IP |
 
 ## As detecções
@@ -40,6 +40,7 @@ Depois: **Apps → obs-lab Fraude → Fraude - obs-lab**.
 | Velocity abuse em pedidos | `velocity_abuse` | 3 |
 | Bot scraping do catálogo | `bot_scraping` | 2 |
 | Credential stuffing | `credential_stuffing` | 4 |
+| Card cycling (motor de risco) | `card_cycling` | 5 |
 | **Risco acumulado por IP** | correlação | 5 |
 
 A última é a que vale na demo: soma o `risk_score` de todas as ameaças do mesmo
@@ -49,6 +50,27 @@ correlação em vez de alerta isolado.
 
 Os disparos aparecem em **Activity → Triggered Alerts** (`alert.track = 1`), que
 é o mais perto de um notable que Splunk Enterprise puro entrega.
+
+## Motor de risco do checkout
+
+Os detectores acima são regra única. O checkout também passa por um **motor de
+risco** (`riskEngine` em `services/gateway/src/security.js`) que soma pontos por
+sinal do dispositivo (`X-Device-Id`; sem ele, o IP) numa janela de 10 min:
+
+| Sinal | Pontos |
+|---|---|
+| 3-4 cartões distintos / 5+ | +25 / +50 |
+| 3+ contas distintas | +20 |
+| mais de 5 tentativas em 2 min | +15 |
+| aparelho novo na conta | +10 |
+| valor acima de US$ 250 | +10 |
+| já bloqueado antes | +20 |
+
+**< 40 aprova, 40-69 responde 428 (pede 3DS), >= 70 responde 403.** Toda decisão
+vira `event_type=risk_decision` com `risk_score`, `decision` e `rules{}`
+(macro `obs_lab_risk`); com 3+ cartões e decisão diferente de aprovar, sai como
+`threat=card_cycling`. O ataque do load-gen (`fraudCardCycling`) usa 8 cartões
+em 4 contas: aprova 2, desafia 2 e bloqueia a partir do 5º cartão.
 
 ## CIM
 

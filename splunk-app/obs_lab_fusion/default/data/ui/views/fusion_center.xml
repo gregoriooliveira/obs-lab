@@ -24,7 +24,7 @@
       "type": "ds.search",
       "name": "ds_usd",
       "options": {
-        "query": "`obs_lab_fraud` (threat=price_tampering OR threat=card_testing) | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), true(), 0) | stats sum(usd) as usd | eval usd=round(usd,2)"
+        "query": "`obs_lab_fraud` (threat=price_tampering OR threat=card_testing OR threat=card_cycling) | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), threat=\"card_cycling\", tonumber(amount), true(), 0) | stats sum(usd) as usd | eval usd=round(usd,2)"
       }
     },
     "ds_contas": {
@@ -66,7 +66,7 @@
       "type": "ds.search",
       "name": "ds_sankey",
       "options": {
-        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | eval tecnica=mitre_id.\" \".mitre_tecnica, rota=case(event_type=\"login\",\"POST /api/login\", event_type=\"catalogue_access\",\"GET /api/products\", true(),\"POST /api/checkout\"), desfecho=if(blocked=\"true\",\"Bloqueado\",\"Passou\") | eval par=mvappend(pais.\"#\".tecnica, tecnica.\"#\".rota, rota.\"#\".desfecho) | mvexpand par | rex field=par \"^(?<source>[^#]+)#(?<target>.+)$\" | stats count as value by source, target"
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | eval tecnica=mitre_id.\" \".mitre_tecnica, rota=case(event_type=\"login\",\"POST /api/login\", event_type=\"catalogue_access\",\"GET /api/products\", true(),\"POST /api/checkout\"), desfecho=case(decision=\"challenge\",\"Desafio 3DS\", blocked=\"true\",\"Bloqueado\", true(),\"Passou\") | eval par=mvappend(pais.\"#\".tecnica, tecnica.\"#\".rota, rota.\"#\".desfecho) | mvexpand par | rex field=par \"^(?<source>[^#]+)#(?<target>.+)$\" | stats count as value by source, target"
       }
     },
     "ds_funil": {
@@ -87,7 +87,7 @@
       "type": "ds.search",
       "name": "ds_casos",
       "options": {
-        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), true(), 0) | stats sum(risk_score) as risco, dc(threat) as vetores, values(dominio) as dominios, values(mitre_id) as mitre, values(controle_pci) as pci, values(username) as contas, sum(usd) as usd_em_risco, count(eval(blocked=\"true\")) as bloqueados, count as eventos, latest(_time) as ultimo by client_ip, pais, cidade, ator | join type=left client_ip [search `obs_lab_http` service=gateway-service http_path=\"/api/checkout\" http_status=201 | stats count as compras_aprovadas by client_ip] | fillnull value=0 compras_aprovadas | eval bloqueio_pct=round(bloqueados*100/eventos,0), usd_em_risco=round(usd_em_risco,2), ultimo=strftime(ultimo,\"%H:%M:%S\"), severidade=case(vetores>=2 AND risco>300,\"CRITICA\", risco>300,\"ALTA\", risco>100,\"MEDIA\", true(),\"BAIXA\") | sort - risco | head 25 | table severidade, client_ip, pais, cidade, ator, dominios, mitre, risco, vetores, contas, compras_aprovadas, usd_em_risco, bloqueio_pct, pci, ultimo"
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | rex field=detail \"diff=(?<diff>[\\d.]+)\" | eval usd=case(threat=\"price_tampering\", tonumber(diff), threat=\"card_testing\", tonumber(amount), threat=\"card_cycling\", tonumber(amount), true(), 0) | stats sum(risk_score) as risco, dc(threat) as vetores, values(dominio) as dominios, values(mitre_id) as mitre, values(controle_pci) as pci, values(username) as contas, sum(usd) as usd_em_risco, count(eval(blocked=\"true\")) as bloqueados, count as eventos, latest(_time) as ultimo by client_ip, pais, cidade, ator | join type=left client_ip [search `obs_lab_http` service=gateway-service http_path=\"/api/checkout\" http_status=201 | stats count as compras_aprovadas by client_ip] | fillnull value=0 compras_aprovadas | eval bloqueio_pct=round(bloqueados*100/eventos,0), usd_em_risco=round(usd_em_risco,2), ultimo=strftime(ultimo,\"%H:%M:%S\"), severidade=case(vetores>=2 AND risco>300,\"CRITICA\", risco>300,\"ALTA\", risco>100,\"MEDIA\", true(),\"BAIXA\") | sort - risco | head 25 | table severidade, client_ip, pais, cidade, ator, dominios, mitre, risco, vetores, contas, compras_aprovadas, usd_em_risco, bloqueio_pct, pci, ultimo"
       }
     },
     "ds_grafo": {
@@ -102,6 +102,27 @@
       "name": "ds_corr",
       "options": {
         "query": "`obs_lab_app` service=gateway-service (logger=security OR logger=http) | eval st=tonumber(http_status) | timechart span=1m count(eval(isnotnull(threat))) as ataques, count(eval(st>=500)) as erros_5xx, count(eval(http_path=\"/api/checkout\" AND st<300)) as checkouts_ok"
+      }
+    },
+    "ds_risk_dec": {
+      "type": "ds.search",
+      "name": "ds_risk_dec",
+      "options": {
+        "query": "`obs_lab_risk` | timechart span=1m count by decision"
+      }
+    },
+    "ds_risk_hist": {
+      "type": "ds.search",
+      "name": "ds_risk_hist",
+      "options": {
+        "query": "`obs_lab_risk` | eval faixa=case(risk_score<20,\"0-19\", risk_score<40,\"20-39 aprova\", risk_score<55,\"40-54 desafio\", risk_score<70,\"55-69 desafio\", risk_score<90,\"70-89 bloqueio\", true(),\"90-100 bloqueio\") | stats count by faixa | sort faixa"
+      }
+    },
+    "ds_risk_dev": {
+      "type": "ds.search",
+      "name": "ds_risk_dev",
+      "options": {
+        "query": "`obs_lab_risk` | `obs_lab_geo_enrich` | stats dc(card_fp) as cartoes, dc(username) as contas, max(risk_score) as score, count(eval(decision=\"approve\")) as aprovadas, count(eval(decision=\"challenge\")) as desafio_3ds, count(eval(decision=\"block\")) as bloqueadas, sum(eval(if(decision=\"approve\",amount,0))) as usd_que_passou, values(pais) as pais by device_id | where cartoes>=3 | eval usd_que_passou=round(usd_que_passou,2), decisao_final=case(bloqueadas>0,\"BLOQUEADO\", desafio_3ds>0,\"DESAFIO\", true(),\"APROVADO\") | sort - score | head 15 | table decisao_final, device_id, pais, score, cartoes, contas, aprovadas, desafio_3ds, bloqueadas, usd_que_passou"
       }
     },
     "ds_compliance": {
@@ -345,6 +366,71 @@
         "legendDisplay": "bottom"
       }
     },
+    "viz_risk_titulo": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "### Motor de risco do checkout\nCada checkout soma pontos por sinal do **dispositivo**: cartoes distintos (3+: +25, 5+: +50), contas distintas (+20), rajada em 2 min (+15), aparelho novo na conta (+10), valor alto (+10), bloqueio anterior (+20). **< 40 aprova, 40-69 pede 3DS, >= 70 bloqueia.**",
+        "fontColor": "#e1e6eb"
+      }
+    },
+    "viz_risk_dec": {
+      "type": "splunk.column",
+      "title": "Decisoes do motor por minuto",
+      "dataSources": {
+        "primary": "ds_risk_dec"
+      },
+      "options": {
+        "stackMode": "stacked",
+        "legendDisplay": "bottom",
+        "seriesColorsByField": {
+          "approve": "#53a051",
+          "challenge": "#f8be34",
+          "block": "#dc4e41"
+        }
+      }
+    },
+    "viz_risk_hist": {
+      "type": "splunk.bar",
+      "title": "Distribuicao do score",
+      "dataSources": {
+        "primary": "ds_risk_hist"
+      },
+      "options": {
+        "legendDisplay": "off",
+        "dataValuesDisplay": "all"
+      }
+    },
+    "viz_risk_dev": {
+      "type": "splunk.table",
+      "title": "Dispositivos com 3+ cartoes - o score cresce e a decisao muda",
+      "dataSources": {
+        "primary": "ds_risk_dev"
+      },
+      "options": {
+        "count": 10,
+        "columnFormat": {
+          "decisao_final": {
+            "rowBackgroundColors": "> table | seriesByName(\"decisao_final\") | matchValue(dec)"
+          }
+        }
+      },
+      "context": {
+        "dec": [
+          {
+            "match": "BLOQUEADO",
+            "value": "#dc4e41"
+          },
+          {
+            "match": "DESAFIO",
+            "value": "#f8be34"
+          },
+          {
+            "match": "APROVADO",
+            "value": "#53a051"
+          }
+        ]
+      }
+    },
     "viz_compliance": {
       "type": "splunk.table",
       "title": "Controles sob pressao (PCI DSS 4.0 / LGPD)",
@@ -382,7 +468,7 @@
     "type": "absolute",
     "options": {
       "width": 1600,
-      "height": 2100,
+      "height": 2880,
       "display": "auto-scale"
     },
     "structure": [
@@ -544,6 +630,46 @@
           "y": 1860,
           "w": 790,
           "h": 230
+        }
+      },
+      {
+        "item": "viz_risk_titulo",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 2100,
+          "w": 1600,
+          "h": 70
+        }
+      },
+      {
+        "item": "viz_risk_dec",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 2180,
+          "w": 800,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_risk_hist",
+        "type": "block",
+        "position": {
+          "x": 810,
+          "y": 2180,
+          "w": 790,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_risk_dev",
+        "type": "block",
+        "position": {
+          "x": 0,
+          "y": 2490,
+          "w": 1600,
+          "h": 380
         }
       }
     ],

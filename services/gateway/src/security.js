@@ -158,7 +158,50 @@ function detectStuffing(ip, username) {
   };
 }
 
+// 6. MOTOR DE RISCO DO CHECKOUT
+// Diferente dos detectores acima (uma regra = um alerta), aqui cada sinal SOMA
+// pontos e a soma decide: aprova, pede desafio (3DS/step-up) ou bloqueia. O
+// caso que ele pega e o "card cycling": uma mesma maquina testando varios
+// cartoes em varias contas em poucos minutos. A chave e o dispositivo
+// (X-Device-Id, o fingerprint que o front manda); sem ele, cai no IP.
+const RISK_WINDOW_MS = 10 * 60 * 1000;
+const RISK_CHALLENGE = parseInt(process.env.RISK_CHALLENGE_SCORE || '40', 10);
+const RISK_BLOCK     = parseInt(process.env.RISK_BLOCK_SCORE || '70', 10);
+const devices = new Map();          // deviceId -> { hits: [{t, card, customer}], blocks }
+const knownPairs = new Set();       // "device|customer" ja vistos
+function riskEngine({ deviceId, cardFp, customerId, amount }) {
+  const now = Date.now();
+  const d = devices.get(deviceId) || { hits: [], blocks: 0 };
+  d.hits = d.hits.filter(h => now - h.t < RISK_WINDOW_MS);
+  d.hits.push({ t: now, card: cardFp, customer: customerId });
+  devices.set(deviceId, d);
+
+  const cards     = new Set(d.hits.map(h => h.card).filter(Boolean)).size;
+  const customers = new Set(d.hits.map(h => h.customer)).size;
+  const last2min  = d.hits.filter(h => now - h.t < 120000).length;
+  const pair = `${deviceId}|${customerId}`;
+  const newPair = !knownPairs.has(pair);
+
+  const rules = [];
+  const add = (name, pts) => rules.push({ name, pts });
+  if (cards >= 5)          add(`cartoes_distintos=${cards}`, 50);
+  else if (cards >= 3)     add(`cartoes_distintos=${cards}`, 25);
+  if (customers >= 3)      add(`contas_distintas=${customers}`, 20);
+  if (last2min > 5)        add(`tentativas_2min=${last2min}`, 15);
+  if (newPair)             add('dispositivo_novo_na_conta', 10);
+  if (amount > 250)        add(`valor_alto=${amount.toFixed(2)}`, 10);
+  if (d.blocks > 0)        add(`bloqueios_anteriores=${d.blocks}`, 20);
+
+  const score = Math.min(100, rules.reduce((s, r) => s + r.pts, 0));
+  const decision = score >= RISK_BLOCK ? 'block' : score >= RISK_CHALLENGE ? 'challenge' : 'approve';
+  if (decision === 'block') d.blocks++;
+  // so aprova "aprende" o par: conta atacada nao vira conhecida do dispositivo
+  if (decision === 'approve') knownPairs.add(pair);
+  return { score, decision, cards, customers, rules: rules.map(r => `${r.name}:+${r.pts}`) };
+}
+
 module.exports = {
   sha256, logSecurity, clientIp, hitWindow, peekWindow, persistEvent,
-  detectScraping, detectTampering, detectCardTesting, detectVelocity, detectStuffing, tracer,
+  detectScraping, detectTampering, detectCardTesting, detectVelocity, detectStuffing,
+  riskEngine, tracer,
 };

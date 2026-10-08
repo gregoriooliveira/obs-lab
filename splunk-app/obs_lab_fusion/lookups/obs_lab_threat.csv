@@ -6,3 +6,4 @@ price_tampering,fraude,T1565.002,Transmitted Data Manipulation,Impact,PCI 6.2.4 
 card_testing,fraude,T1657,Financial Theft,Impact,PCI 10.4.1 revisao de logs,nao se aplica
 velocity_abuse,fraude,T1657,Financial Theft,Impact,PCI 10.4.1 revisao de logs,nao se aplica
 bot_scraping,cyber,T1119,Automated Collection,Collection,PCI 6.4.2 protecao de app web,nao se aplica
+card_cycling,fraude,T1657,Financial Theft,Impact,PCI 12.10.1 resposta a incidente,nao se aplica

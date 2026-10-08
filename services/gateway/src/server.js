@@ -206,6 +206,33 @@ app.post('/api/checkout', async (req, res) => {
     const vel = sec.detectVelocity(customerId, ip);
     if (vel) { reportFraud(vel.evt); if (vel.blocked) { span.end(); return res.status(429).json({ error: 'order velocity exceeded' }); } }
 
+    // motor de risco: soma sinais do dispositivo e decide aprova/desafio/bloqueio
+    const deviceId = req.headers['x-device-id'] || `ip:${ip}`;
+    const cardFp = (req.body || {}).cardFingerprint || null;
+    const risk = sec.riskEngine({ deviceId, cardFp, customerId, amount });
+    // rotulo so com 3+ cartoes: o card testing (sem cartao, muitas contas) tambem
+    // passa de 3 contas e sairia como card_cycling
+    const multi = risk.cards >= 3;
+    const riskEvt = { event_type: 'risk_decision', client_ip: ip, username: customerId,
+                      device_id: deviceId, card_fp: cardFp, amount: Number(amount.toFixed(2)),
+                      risk_score: risk.score, decision: risk.decision,
+                      blocked: risk.decision === 'block', rules: risk.rules,
+                      detail: risk.rules.join(' ') || 'sem_sinais' };
+    // so vira "fraude" (threat) quando a decisao nao e aprovar E o padrao e de
+    // varios cartoes/contas; o resto e log de decisao, sem ir pro banco
+    if (risk.decision !== 'approve' && multi) reportFraud({ ...riskEvt, threat: 'card_cycling' });
+    else sec.logSecurity(riskEvt);
+    span.setAttribute('risk.score', risk.score);
+    span.setAttribute('risk.decision', risk.decision);
+    if (risk.decision === 'block') {
+      span.end();
+      return res.status(403).json({ error: 'transaction blocked by risk engine', risk_score: risk.score });
+    }
+    if (risk.decision === 'challenge') {
+      span.end();
+      return res.status(428).json({ error: 'step-up authentication required', challenge: '3ds', risk_score: risk.score });
+    }
+
     try {
       const r = await postJSON(`${ORDERS_URL}/orders`, req.body);
       span.setAttribute('order.status', r.body.status || 'unknown');
