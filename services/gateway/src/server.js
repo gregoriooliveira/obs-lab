@@ -231,8 +231,14 @@ app.post('/api/login', async (req, res) => {
     span.setAttribute('client.ip', ip);
     authTotal.add(1, { username });
 
-    const ipRate   = sec.hitWindow(`login-ip:${ip}`, 60000);
-    const userRate = sec.hitWindow(`login-user:${username}`, 60000);
+    // FALHAS anteriores na janela, nao tentativas. Contando tentativa, toda
+    // conta sob brute force (alice/bob) passava de 5 com os logins do proprio
+    // dono e de qualquer IP: em 6h de 2026-10-08 foram 0 logins com sucesso e
+    // 0 account_takeover - tudo virava brute_force + 429 antes da senha.
+    const failKeys = [`login-fail-ip:${ip}`, `login-fail-user:${username}`];
+    const ipRate   = sec.peekWindow(failKeys[0]);
+    const userRate = sec.peekWindow(failKeys[1]);
+    const countFail = () => failKeys.forEach(k => sec.hitWindow(k));
 
     try {
       const r = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
@@ -248,8 +254,10 @@ app.post('/api/login', async (req, res) => {
         }
       }
 
-      if (!stuff && (ipRate > 5 || userRate > 5)) {
-        const risk = Math.min(100, Math.max(ipRate, userRate) * 12);
+      // >= 5 falhas anteriores = esta e a 6a tentativa, mesmo corte de antes
+      if (!stuff && (ipRate >= 5 || userRate >= 5)) {
+        countFail();
+        const risk = Math.min(100, (Math.max(ipRate, userRate) + 1) * 12);
         const evt = { event_type: 'login', threat: 'brute_force', username, client_ip: ip,
                       risk_score: risk, blocked: risk > 70,
                       detail: `ip_attempts=${ipRate} user_attempts=${userRate}` };
@@ -280,6 +288,7 @@ app.post('/api/login', async (req, res) => {
       const ok = user && !user.locked && user.password_hash === sec.sha256(password);
 
       if (!ok) {
+        countFail();
         if (user) await pool.query('UPDATE users SET failed_logins = failed_logins + 1 WHERE username = $1', [username]).catch(()=>{});
         sec.logSecurity({ event_type: 'login', outcome: 'fail', username, client_ip: ip, risk_score: 20,
                           detail: user ? (user.locked ? 'account_locked' : 'bad_password') : 'unknown_user' });

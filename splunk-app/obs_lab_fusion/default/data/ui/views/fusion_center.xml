@@ -59,7 +59,7 @@
       "type": "ds.search",
       "name": "ds_mapa",
       "options": {
-        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | where ator!=\"cliente\" AND isnotnull(lat) | stats sum(risk_score) as risco, count as eventos, values(threat) as ameacas by pais, cidade, lat, lon | sort - risco"
+        "query": "`obs_lab_fraud` | `obs_lab_geo_enrich` | `obs_lab_threat_enrich` | where ator!=\"cliente\" AND isnotnull(lat) | geostats latfield=lat longfield=lon globallimit=0 sum(risk_score) as risco"
       }
     },
     "ds_sankey": {
@@ -126,26 +126,7 @@
       "dataSources": {
         "primary": "ds_risco"
       },
-      "options": {
-        "majorColor": "> majorValue | rangeValue(cores)"
-      },
-      "context": {
-        "cores": [
-          {
-            "to": 5000,
-            "value": "#53a051"
-          },
-          {
-            "from": 5000,
-            "to": 20000,
-            "value": "#f8be34"
-          },
-          {
-            "from": 20000,
-            "value": "#dc4e41"
-          }
-        ]
-      }
+      "options": {}
     },
     "viz_k_ips": {
       "type": "splunk.singlevalue",
@@ -270,12 +251,14 @@
           0
         ],
         "zoom": 1.3,
+        "baseLayerTileServer": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        "baseLayerTileServerType": "raster",
         "layers": [
           {
             "type": "bubble",
-            "latitude": "> primary | seriesByName('lat')",
-            "longitude": "> primary | seriesByName('lon')",
-            "bubbleSize": "> primary | seriesByName('risco')"
+            "latitude": "> primary | seriesByName('latitude')",
+            "longitude": "> primary | seriesByName('longitude')",
+            "bubbleSize": "> primary | frameWithoutSeriesNames('_geo_bounds_east', '_geo_bounds_west', '_geo_bounds_north', '_geo_bounds_south', 'latitude', 'longitude')"
           }
         ]
       }

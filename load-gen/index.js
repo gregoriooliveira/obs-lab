@@ -163,7 +163,9 @@ async function fraudVelocity() {
   }
 }
 async function fraudBruteForce() {
-  const user = rand(['alice', 'admin', 'bob']);
+  // so admin/root: alice e bob sao as vitimas do stuffing e do ATO. Com eles
+  // aqui o bloqueio por falhas travava as duas contas e a cadeia nunca fechava.
+  const user = rand(['admin', 'root']);
   const hdrs = xff(ACTORS.bruteForce);
   for (let i = 0; i < 8; i++) {
     const r = await req('POST', '/api/login', { username: user, password: `wrong${i}` }, hdrs);

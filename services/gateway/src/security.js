@@ -34,6 +34,13 @@ function hitWindow(key, windowMs = 60000) {
   return arr.length;
 }
 
+// Le a janela sem registrar hit. O login conta FALHAS, nao tentativas: quem
+// so registra acontece no caminho de falha.
+function peekWindow(key, windowMs = 60000) {
+  const now = Date.now();
+  return (windows.get(key) || []).filter(t => now - t < windowMs).length;
+}
+
 async function persistEvent(pool, evt) {
   try {
     await pool.query(
@@ -152,6 +159,6 @@ function detectStuffing(ip, username) {
 }
 
 module.exports = {
-  sha256, logSecurity, clientIp, hitWindow, persistEvent,
+  sha256, logSecurity, clientIp, hitWindow, peekWindow, persistEvent,
   detectScraping, detectTampering, detectCardTesting, detectVelocity, detectStuffing, tracer,
 };
