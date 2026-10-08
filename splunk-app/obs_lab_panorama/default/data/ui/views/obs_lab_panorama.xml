@@ -237,6 +237,100 @@
     </panel>
   </row>
 
+  <!-- ===================== APM DE TERCEIRO - AppDynamics ===================== -->
+  <row>
+    <panel>
+      <html>
+        <h2 style="color:#dc4e41;margin:4px 0">APM DE TERCEIRO - AppDynamics</h2>
+        <p style="color:#888">O mesmo app, visto pelo outro APM. Vem do Cisco Splunk Add-on for AppDynamics a cada 5 min (index=appdynamics). O deepLink abre a tela exata no controller.</p>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <single>
+        <title>BTs saudaveis (AppD)</title>
+        <search>
+          <query>`obs_lab_appd` source=application_status application_name="obs-lab" | head 1 | eval total=btHealthNormal+btHealthWarning+btHealthCritical, pct=round(btHealthNormal*100/total,0) | fields pct</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="unit">%</option>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0xdc4e41","0xf8be34","0x53a051"]</option>
+        <option name="rangeValues">[80,95]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Chamadas por minuto (AppD)</title>
+        <search>
+          <query>`obs_lab_appd` source=application_status application_name="obs-lab" | head 1 | eval cpm=round(callsPerMinute,0) | fields cpm</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Requisicoes lentas (snapshots AppD)</title>
+        <search>
+          <query>`obs_lab_appd_events` type=REQUEST_SEGMENT_DATA | stats count</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[50,200]</option>
+        <option name="useColors">1</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Tiers no AppDynamics - estado e volume (somado das BTs)</title>
+        <search>
+          <query>`obs_lab_appd` source=business_transaction_status application_name="obs-lab" | stats latest(callsPerMinute) as cpm, latest(averageResponseTime) as art by applicationComponentName, business_transaction_name | where cpm&gt;=0 | stats sum(cpm) as chamadas_min, max(art) as pior_bt_ms, count as bts by applicationComponentName | rename applicationComponentName as tier | join type=left tier [search `obs_lab_appd` source=tier_status | stats latest(state) as estado, latest(node_count) as nos by tierName | rename tierName as tier] | table tier, estado, nos, bts, chamadas_min, pior_bt_ms</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Business transactions mais lentas (AppD)</title>
+        <search>
+          <query>`obs_lab_appd` source=business_transaction_status application_name="obs-lab" | stats latest(averageResponseTime) as resposta_ms, latest(callsPerMinute) as chamadas_min, latest(errorsPerMinute) as erros_min by applicationComponentName, business_transaction_name | where resposta_ms&gt;=0 | sort - resposta_ms | head 10 | rename applicationComponentName as tier, business_transaction_name as bt</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <table>
+        <title>Requisicoes lentas por no (AppD) - o link abre o snapshot no controller</title>
+        <search>
+          <query>`obs_lab_appd_events` | eval tipo=if(type="REQUEST_SEGMENT_DATA", lower(experience), type) | stats count as eventos, latest(deepLink) as ultimo_snapshot by node_name, tipo | sort - eventos</query>
+          <earliest>$tempo.earliest$</earliest>
+          <latest>$tempo.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
   <!-- ===================== APLICACAO ===================== -->
   <row>
     <panel>

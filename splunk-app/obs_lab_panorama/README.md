@@ -18,6 +18,7 @@ O painel usa macros que vivem no app `obs_lab_fraud` e estao com
 | `obs_lab_security` | so os eventos de seguranca |
 | `obs_lab_fraud` | so os eventos que sao fraude |
 | `obs_lab_te` | metricas do stream do ThousandEyes |
+| `obs_lab_appd`, `obs_lab_appd_events` | AppDynamics via Cisco Splunk Add-on for AppDynamics (`index=appdynamics`) |
 | `obs_lab_synth_*` | Splunk Synthetics via `\| sim flow` (Infrastructure Monitoring Add-on) |
 
 Este app **nao redefine** nenhum deles de proposito. Macro duplicado em dois

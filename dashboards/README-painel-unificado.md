@@ -113,7 +113,17 @@ Ele instala no Splunk Enterprise e traz duas coisas:
 
 ---
 
-## Fonte 4 — AppDynamics (o "outro APM") ⏳ A FAZER
+## Fonte 4 — AppDynamics (o "outro APM") ✅
+
+Feito com o **Cisco Splunk Add-on for AppDynamics** (3.2.1): conexão `obs-lab`
+(OAuth, API client `splunk-obs-lab` com role *Applications & Dashboards Viewer*),
+inputs `obs_lab_status` e `obs_lab_events` a cada 300 s com janela de 5 min, no
+índice `appdynamics`. Janela de 1 min devolvia `callsPerMinute=0`: o minuto ainda
+não fechou no controller. `tier_status` traz estado e nós, mas volume sempre 0 —
+o volume por tier sai da soma das BTs, e BT conta no tier de **entrada** (as
+chamadas a orders/payment ficam dentro de `/api/checkout` do gateway).
+
+### Como era o plano
 
 E o ponto mais forte da narrativa: o cliente nao precisa trocar de APM para
 ter painel unico.
