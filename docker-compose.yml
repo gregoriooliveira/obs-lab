@@ -25,6 +25,10 @@ services:
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
       # erro no /health so pra chamada que vem pela Cloudflare (teste externo)
       EDGE_HEALTH_ERROR_RATE: "${EDGE_HEALTH_ERROR_RATE:-0.12}"
+      # incidente de borda: POST /chaos/edge-incident?minutes=15 (interno) ou semanal
+      EDGE_INCIDENT_WEEKLY: "${EDGE_INCIDENT_WEEKLY:-}"
+      EDGE_INCIDENT_MINUTES: "${EDGE_INCIDENT_MINUTES:-15}"
+      EDGE_INCIDENT_ERROR_RATE: "${EDGE_INCIDENT_ERROR_RATE:-0.8}"
       # auth + auditoria de fraude (users / security_events) vivem no Postgres
       DB_HOST: inventory-db
       DB_PORT: "5432"

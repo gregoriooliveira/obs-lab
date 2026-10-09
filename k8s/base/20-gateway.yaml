@@ -49,6 +49,10 @@ spec:
             - { name: LATENCY_JITTER_MS,  value: "150" }
             # erro no /health so pra chamada que vem pela Cloudflare (teste externo)
             - { name: EDGE_HEALTH_ERROR_RATE, value: "0.12" }
+            # incidente de borda: POST /chaos/edge-incident?minutes=15 (interno) ou semanal
+            - { name: EDGE_INCIDENT_WEEKLY,     value: "" }
+            - { name: EDGE_INCIDENT_MINUTES,    value: "15" }
+            - { name: EDGE_INCIDENT_ERROR_RATE, value: "0.8" }
             # ── DB: auth (users) + auditoria de fraude (security_events) ──
             - { name: DB_HOST, value: inventory-db }
             - { name: DB_PORT, value: "5432" }

@@ -139,13 +139,76 @@ function pickEdgeError() {
   for (const e of EDGE_ERRORS) { n -= e.w; if (n <= 0) return e; }
   return EDGE_ERRORS[0];
 }
+// Incidente de borda: janela continua (padrao 15 min) com ~80% de erro no
+// /health externo, codigo dominante revezando a cada 5 min (503 -> 500 -> 404)
+// pra o TE mostrar um incidente de verdade, nao um erro solto por rodada.
+// Dispara de dois jeitos:
+//   - na hora: POST /chaos/edge-incident?minutes=15 (so pela rede interna -
+//     com cf-ray, ou seja vindo da internet, responde 403)
+//   - semanal (opcional): EDGE_INCIDENT_WEEKLY="wed 14:00" (UTC); vazio = desligado
+const EDGE_INCIDENT_RATE = () => parseFloat(process.env.EDGE_INCIDENT_ERROR_RATE || '0.8');
+const EDGE_INCIDENT_MIN  = () => parseInt(process.env.EDGE_INCIDENT_MINUTES || '15', 10);
+const INCIDENT_PHASES = [503, 500, 404];
+let incidentUntil = 0, incidentStart = 0, incidentLogged = false;
+function startIncident(minutes, origem) {
+  incidentStart = Date.now();
+  incidentUntil = incidentStart + minutes * 60000;
+  incidentLogged = true;
+  log.warn(`edge incident started (${minutes} min, ${origem})`,
+           { logger: 'chaos', event_type: 'edge_incident', outcome: 'start', minutes, origem });
+}
+function weeklyWindowStart(now) {
+  const spec = (process.env.EDGE_INCIDENT_WEEKLY || '').trim().toLowerCase();
+  const m = spec.match(/^(sun|mon|tue|wed|thu|fri|sat)\s+(\d{1,2}):(\d{2})$/);
+  if (!m) return 0;
+  const d = new Date(now);
+  const dow = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(m[1]);
+  const start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(),
+    d.getUTCDate() - ((d.getUTCDay() - dow + 7) % 7), +m[2], +m[3]);
+  return now >= start && now < start + EDGE_INCIDENT_MIN() * 60000 ? start : 0;
+}
+function incidentStatus(now) {
+  if (now < incidentUntil) return INCIDENT_PHASES[Math.floor((now - incidentStart) / 300000) % 3];
+  if (incidentLogged) {
+    incidentLogged = false;
+    log.info('edge incident ended', { logger: 'chaos', event_type: 'edge_incident', outcome: 'end' });
+  }
+  const w = weeklyWindowStart(now);
+  if (w) {
+    if (incidentUntil < w) startIncident(EDGE_INCIDENT_MIN(), 'semanal');
+    return INCIDENT_PHASES[Math.floor((now - w) / 300000) % 3];
+  }
+  return 0;
+}
+app.post('/chaos/edge-incident', (req, res) => {
+  if (req.headers['cf-ray']) return res.status(403).json({ error: 'interno apenas' });
+  const minutes = Math.min(120, Math.max(1, parseInt(req.query.minutes || EDGE_INCIDENT_MIN(), 10)));
+  startIncident(minutes, 'manual');
+  res.json({ status: 'incident started', minutes, until: new Date(incidentUntil).toISOString() });
+});
+app.delete('/chaos/edge-incident', (req, res) => {
+  if (req.headers['cf-ray']) return res.status(403).json({ error: 'interno apenas' });
+  incidentUntil = 0;
+  res.json({ status: 'incident stopped' });
+});
+
 app.get('/health', (req, res) => {
-  if (req.headers['cf-ray'] && Math.random() < EDGE_HEALTH_ERROR_RATE()) {
-    const e = pickEdgeError();
-    return res.status(e.status).json({ service: 'gateway-service', ...e.body });
+  if (req.headers['cf-ray']) {
+    const dominante = incidentStatus(Date.now());
+    if (dominante && Math.random() < EDGE_INCIDENT_RATE()) {
+      // 80% do erro no codigo da fase, 20% espalhado nos outros: oscila
+      const status = Math.random() < 0.8 ? dominante : rand2(INCIDENT_PHASES.filter(s => s !== dominante));
+      const e = EDGE_ERRORS.find(x => x.status === status);
+      return res.status(status).json({ service: 'gateway-service', incident: true, ...e.body });
+    }
+    if (!dominante && Math.random() < EDGE_HEALTH_ERROR_RATE()) {
+      const e = pickEdgeError();
+      return res.status(e.status).json({ service: 'gateway-service', ...e.body });
+    }
   }
   res.json({ status: 'ok', service: 'gateway-service' });
 });
+const rand2 = arr => arr[Math.floor(Math.random() * arr.length)];
 
 // Health de cadeia: consulta orders e payment antes de responder.
 // /health responde pela borda; este responde pela jornada, entao cai junto com
