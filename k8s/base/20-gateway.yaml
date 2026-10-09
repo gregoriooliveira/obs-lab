@@ -47,6 +47,8 @@ spec:
             - { name: HOSTNAME_LAB,      value: "$(NODE_NAME)" }
             - { name: ORDERS_URL,         value: http://orders-service:8081 }
             - { name: LATENCY_JITTER_MS,  value: "150" }
+            # erro no /health so pra chamada que vem pela Cloudflare (teste externo)
+            - { name: EDGE_HEALTH_ERROR_RATE, value: "0.12" }
             # ── DB: auth (users) + auditoria de fraude (security_events) ──
             - { name: DB_HOST, value: inventory-db }
             - { name: DB_PORT, value: "5432" }

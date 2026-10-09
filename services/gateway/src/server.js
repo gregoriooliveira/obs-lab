@@ -121,7 +121,31 @@ function postJSON(url, body, timeoutMs = 15000) {
   });
 }
 
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'gateway-service' }));
+// Falha de borda: so para chamada que chegou pela Cloudflare (header cf-ray),
+// ou seja, os testes externos do ThousandEyes e do Synthetics pelo tunel.
+// Probe do Kubernetes, make status, load-gen e agente interno do TE batem
+// direto no container, nunca veem erro aqui - e nenhum pod reinicia por isso.
+// O /health do gateway respondia 200 sempre, entao o teste externo nunca
+// enxergava falha (orders/payment so sao alcancados pela rede interna).
+const EDGE_HEALTH_ERROR_RATE = () => parseFloat(process.env.EDGE_HEALTH_ERROR_RATE || '0.12');
+const EDGE_ERRORS = [
+  { status: 500, w: 35, body: { error: 'internal error', reason: 'edge_fault_injected' } },
+  { status: 503, w: 30, body: { status: 'degraded', reason: 'upstream_unavailable' } },
+  { status: 404, w: 20, body: { error: 'not found', reason: 'route_missing_on_edge' } },
+  { status: 502, w: 15, body: { error: 'bad gateway', reason: 'origin_connection_reset' } },
+];
+function pickEdgeError() {
+  let n = Math.random() * EDGE_ERRORS.reduce((s, e) => s + e.w, 0);
+  for (const e of EDGE_ERRORS) { n -= e.w; if (n <= 0) return e; }
+  return EDGE_ERRORS[0];
+}
+app.get('/health', (req, res) => {
+  if (req.headers['cf-ray'] && Math.random() < EDGE_HEALTH_ERROR_RATE()) {
+    const e = pickEdgeError();
+    return res.status(e.status).json({ service: 'gateway-service', ...e.body });
+  }
+  res.json({ status: 'ok', service: 'gateway-service' });
+});
 
 // Health de cadeia: consulta orders e payment antes de responder.
 // /health responde pela borda; este responde pela jornada, entao cai junto com

@@ -23,6 +23,8 @@ services:
       HOSTNAME_LAB: "${HOSTNAME_LAB:-obs-lab-host}"
       ORDERS_URL: http://orders-service:8081
       LATENCY_JITTER_MS: "${LATENCY_JITTER_MS:-150}"
+      # erro no /health so pra chamada que vem pela Cloudflare (teste externo)
+      EDGE_HEALTH_ERROR_RATE: "${EDGE_HEALTH_ERROR_RATE:-0.12}"
       # auth + auditoria de fraude (users / security_events) vivem no Postgres
       DB_HOST: inventory-db
       DB_PORT: "5432"
