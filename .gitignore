@@ -17,3 +17,4 @@ kubeconfig.*
 # ── Build / runtime ──────────────────────────────────────────────────────────
 node_modules/
 npm-debug.log*
+__pycache__/
