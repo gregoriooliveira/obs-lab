@@ -7,9 +7,16 @@ demo; o poll é 5 s (realista de SCADA).
 
 ```
 process-sim ──Modbus TCP:502──┬── telegraf ──HEC──> Splunk (ot_metrics)
-   (modelo elétrico)          └── fuxa (HMI :1881)
-   HTTP :8091 (fault/snapshot/health)
+   (modelo elétrico)          ├── fuxa (HMI :1881)
+   HTTP :8091 (fault/...)     └── meter-sim ──MQTT──> mosquitto ──┘
+                                 (medidores, fase 2)   HTTP :8092 (fraude/...)
 ```
+
+Duas camadas: o **process-sim** entrega a carga por alimentador (SCADA/Modbus); o
+**meter-sim** rateia essa carga entre 60 **medidores** (UCs) e publica o consumo
+por MQTT. A diferença entre o que o alimentador entrega e o que os medidores
+reportam é a **perda** — técnica (honesta) + não-técnica (furto). Fraude e a
+ponte com a TI: ver [`../FRAUDE.md`](../FRAUDE.md).
 
 ## Subir
 
@@ -59,6 +66,29 @@ O `telegraf/telegraf.conf` já lê tudo isso e marca cada alimentador com a tag
 inline; `[inputs.modbus.request.tags]` seguido de `fields =` faz o `fields` cair
 dentro de `tags` e o Telegraf não lê campo nenhum.
 
+## Medidores (meter-sim) e furto
+
+60 UCs em `lookups/obs_lab_uc.csv` (gerado por `gen_uc.py`, determinístico). Cada
+UC tem `conta_portal = cust-NNN` — o **mesmo customerId da web store de TI**, que
+é a ponte do Fusion. O `meter-sim` lê o `/snapshot` do process-sim, rateia a carga
+e publica cada medidor em `ot/energia/medidor/<UC>`.
+
+Furto na mão (ou veja as UCs já marcadas no CSV):
+
+```bash
+curl -X POST "http://<host>:8092/fraude?uc=UC-0005&desvio=0.6&tamper=true"
+curl -X DELETE "http://<host>:8092/fraude?uc=UC-0005"
+curl "http://<host>:8092/snapshot"   # leituras atuais dos medidores
+```
+
+- `desvio` = fração do consumo subnotificada (0.6 = reporta 40% do real).
+- `tamper=true` levanta a flag de adulteração (evento `ot/energia/evento/tamper`).
+- Detecção no Splunk: `perda_não_técnica(AL) = potência do alimentador − Σ
+  medidores`. AL-04 (sem furto) fica ~5% (técnica); os demais sobem. Ver
+  [`../FRAUDE.md`](../FRAUDE.md).
+
+Regerar a tabela de UCs (muda nada se a seed for a mesma): `python gen_uc.py`.
+
 ## Config do HMI (FUXA)
 
 Primeira vez, pela UI (http://host:1881):
@@ -72,6 +102,7 @@ Primeira vez, pela UI (http://host:1881):
 
 - **View `obs_lab_ot`** no Splunk (Dashboard Studio) — faço quando o dado estiver
   fluindo no `ot_metrics` (mapa da rede, gauges, alarmes, correlação com TI).
+- **Fusion OT+TI por UC** e roteamento do evento de tamper pro índice `ot` — ver
+  [`../FRAUDE.md`](../FRAUDE.md).
 - **Testes ThousandEyes**: HTTP no HMI (externo via túnel + interno) e
   agent-to-server nos "RTUs" (porta Modbus) — monitorar o enlace até a planta.
-- Fase 2: medidores inteligentes (Mosquitto + MQTT).

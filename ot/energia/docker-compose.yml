@@ -3,7 +3,9 @@
 # credenciais do Splunk por env var, nunca na imagem.
 #
 #   process-sim  modelo eletrico -> Modbus TCP (502) + HTTP de controle (8080)
-#   telegraf     le o Modbus e manda pro Splunk HEC como metrica (ot_metrics)
+#   meter-sim    medidores inteligentes -> consumo por MQTT (furto/tamper)
+#   mosquitto    broker MQTT (medidores -> Telegraf)
+#   telegraf     le Modbus + MQTT e manda pro Splunk HEC como metrica (ot_metrics)
 #   fuxa         HMI/SCADA web (1881) lendo o mesmo Modbus
 name: obs-lab-ot-energia
 
@@ -22,6 +24,28 @@ services:
     restart: unless-stopped
     networks: [ot-net]
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ot-energia-mqtt
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+    networks: [ot-net]
+
+  meter-sim:
+    build: { context: ., dockerfile: meter-sim/Dockerfile }   # precisa de lookups/
+    image: obs-lab-ot-energia-meter:latest
+    container_name: ot-energia-meter
+    environment:
+      PROCESS_SIM_URL: "http://process-sim:8080"   # le a carga dos alimentadores
+      MQTT_HOST: "mosquitto"
+      METER_POLL_S: "${METER_POLL_S:-5}"
+    ports:
+      - "8092:8080"     # HTTP de controle (fraude/snapshot), so pra operar o lab
+    depends_on: [process-sim, mosquitto]
+    restart: unless-stopped
+    networks: [ot-net]
+
   telegraf:
     image: telegraf:1.32
     container_name: ot-energia-telegraf
@@ -31,7 +55,7 @@ services:
       OT_POLL_INTERVAL: "${OT_POLL_INTERVAL:-5s}"  # realista de SCADA
       SPLUNK_HEC_URL: "${SPLUNK_HEC_URL}"
       SPLUNK_HEC_TOKEN: "${SPLUNK_HEC_TOKEN}"
-    depends_on: [process-sim]
+    depends_on: [process-sim, mosquitto]
     restart: unless-stopped
     networks: [ot-net]
 

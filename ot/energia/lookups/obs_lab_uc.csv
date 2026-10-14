@@ -1,0 +1,61 @@
+uc,conta_portal,medidor,alimentador,classe,cidade,lat,lon,peso,furto,desvio
+UC-0001,cust-001,MED-0001,AL-01,comercial,Sao Paulo,-23.539,-46.6607,2.085,1,0.643
+UC-0002,cust-002,MED-0002,AL-01,comercial,Sao Paulo,-23.5089,-46.6472,1.566,0,0.0
+UC-0003,cust-003,MED-0003,AL-01,comercial,Sao Paulo,-23.5585,-46.6182,1.721,0,0.0
+UC-0004,cust-004,MED-0004,AL-01,comercial,Sao Paulo,-23.5172,-46.5918,2.037,0,0.0
+UC-0005,cust-005,MED-0005,AL-01,comercial,Sao Paulo,-23.5926,-46.6579,1.89,0,0.0
+UC-0006,cust-006,MED-0006,AL-01,comercial,Sao Paulo,-23.5176,-46.6696,1.28,0,0.0
+UC-0007,cust-007,MED-0007,AL-01,comercial,Sao Paulo,-23.5871,-46.6348,1.891,0,0.0
+UC-0008,cust-008,MED-0008,AL-01,comercial,Sao Paulo,-23.5953,-46.6127,1.247,0,0.0
+UC-0009,cust-009,MED-0009,AL-01,comercial,Sao Paulo,-23.5414,-46.6191,1.377,0,0.0
+UC-0010,cust-010,MED-0010,AL-01,comercial,Sao Paulo,-23.5583,-46.6127,1.891,0,0.0
+UC-0011,cust-011,MED-0011,AL-01,comercial,Sao Paulo,-23.553,-46.5871,1.678,0,0.0
+UC-0012,cust-012,MED-0012,AL-02,industrial,Campinas,-22.9125,-47.0642,3.941,0,0.0
+UC-0013,cust-013,MED-0013,AL-02,industrial,Campinas,-22.9356,-47.0368,2.534,0,0.0
+UC-0014,cust-014,MED-0014,AL-02,industrial,Campinas,-22.8761,-47.0412,3.765,1,0.315
+UC-0015,cust-015,MED-0015,AL-02,industrial,Campinas,-22.9498,-47.0456,1.911,0,0.0
+UC-0016,cust-016,MED-0016,AL-02,industrial,Campinas,-22.8614,-47.0431,1.969,0,0.0
+UC-0017,cust-017,MED-0017,AL-02,industrial,Campinas,-22.8613,-47.0649,4.192,0,0.0
+UC-0018,cust-018,MED-0018,AL-02,industrial,Campinas,-22.9575,-47.0198,3.732,0,0.0
+UC-0019,cust-019,MED-0019,AL-02,industrial,Campinas,-22.8646,-47.0896,2.273,1,0.638
+UC-0020,cust-020,MED-0020,AL-02,industrial,Campinas,-22.8689,-47.0259,1.893,0,0.0
+UC-0021,cust-021,MED-0021,AL-02,industrial,Campinas,-22.8603,-47.0115,2.512,0,0.0
+UC-0022,cust-022,MED-0022,AL-02,industrial,Campinas,-22.9561,-47.0805,3.002,0,0.0
+UC-0023,cust-023,MED-0023,AL-02,industrial,Campinas,-22.9139,-47.0954,3.125,0,0.0
+UC-0024,cust-024,MED-0024,AL-02,industrial,Campinas,-22.9197,-47.0265,2.147,0,0.0
+UC-0025,cust-025,MED-0025,AL-02,industrial,Campinas,-22.8956,-47.0409,3.447,0,0.0
+UC-0026,cust-026,MED-0026,AL-02,industrial,Campinas,-22.8981,-47.0458,1.821,0,0.0
+UC-0027,cust-027,MED-0027,AL-02,industrial,Campinas,-22.9152,-47.0908,3.708,0,0.0
+UC-0028,cust-028,MED-0028,AL-03,residencial,Belo Horizonte,-19.8941,-43.9364,1.073,0,0.0
+UC-0029,cust-029,MED-0029,AL-03,residencial,Belo Horizonte,-19.8925,-43.8998,1.359,0,0.0
+UC-0030,cust-030,MED-0030,AL-03,residencial,Belo Horizonte,-19.9113,-43.9618,1.003,0,0.0
+UC-0031,cust-031,MED-0031,AL-03,residencial,Belo Horizonte,-19.9354,-43.9416,1.259,0,0.0
+UC-0032,cust-032,MED-0032,AL-03,residencial,Belo Horizonte,-19.9015,-43.9623,1.172,0,0.0
+UC-0033,cust-033,MED-0033,AL-03,residencial,Belo Horizonte,-19.8792,-43.8912,0.889,0,0.0
+UC-0034,cust-034,MED-0034,AL-03,residencial,Belo Horizonte,-19.8876,-43.9072,1.079,0,0.0
+UC-0035,cust-035,MED-0035,AL-03,residencial,Belo Horizonte,-19.8963,-43.9356,1.175,0,0.0
+UC-0036,cust-036,MED-0036,AL-03,residencial,Belo Horizonte,-19.9134,-43.8901,1.072,0,0.0
+UC-0037,cust-037,MED-0037,AL-03,residencial,Belo Horizonte,-19.8804,-43.896,1.16,1,0.599
+UC-0038,cust-038,MED-0038,AL-03,residencial,Belo Horizonte,-19.9432,-43.9669,1.084,0,0.0
+UC-0039,cust-039,MED-0039,AL-03,residencial,Belo Horizonte,-19.9372,-43.9703,0.783,0,0.0
+UC-0040,cust-040,MED-0040,AL-03,residencial,Belo Horizonte,-19.9003,-43.988,0.862,0,0.0
+UC-0041,cust-041,MED-0041,AL-03,residencial,Belo Horizonte,-19.9142,-43.902,0.961,0,0.0
+UC-0042,cust-042,MED-0042,AL-04,rural,Porto Alegre,-30.0428,-51.2356,0.631,0,0.0
+UC-0043,cust-043,MED-0043,AL-04,rural,Porto Alegre,-30.0444,-51.1983,0.906,0,0.0
+UC-0044,cust-044,MED-0044,AL-04,rural,Porto Alegre,-30.0469,-51.2138,0.489,0,0.0
+UC-0045,cust-045,MED-0045,AL-04,rural,Porto Alegre,-30.0194,-51.2176,0.607,0,0.0
+UC-0046,cust-046,MED-0046,AL-04,rural,Porto Alegre,-30.0419,-51.2433,0.496,0,0.0
+UC-0047,cust-047,MED-0047,AL-04,rural,Porto Alegre,-30.0723,-51.2732,0.811,0,0.0
+UC-0048,cust-048,MED-0048,AL-04,rural,Porto Alegre,-29.9867,-51.2134,0.611,0,0.0
+UC-0049,cust-049,MED-0049,AL-05,comercial,Rio de Janeiro,-22.8614,-43.2046,1.78,0,0.0
+UC-0050,cust-050,MED-0050,AL-05,comercial,Rio de Janeiro,-22.8914,-43.1638,1.446,0,0.0
+UC-0051,cust-051,MED-0051,AL-05,comercial,Rio de Janeiro,-22.9544,-43.1859,0.983,0,0.0
+UC-0052,cust-052,MED-0052,AL-05,comercial,Rio de Janeiro,-22.8801,-43.1393,1.326,0,0.0
+UC-0053,cust-053,MED-0053,AL-05,comercial,Rio de Janeiro,-22.8902,-43.1273,1.654,0,0.0
+UC-0054,cust-054,MED-0054,AL-05,comercial,Rio de Janeiro,-22.8844,-43.2016,1.842,1,0.61
+UC-0055,cust-055,MED-0055,AL-05,comercial,Rio de Janeiro,-22.9494,-43.1307,2.212,0,0.0
+UC-0056,cust-056,MED-0056,AL-05,comercial,Rio de Janeiro,-22.9497,-43.1692,1.485,0,0.0
+UC-0057,cust-057,MED-0057,AL-05,comercial,Rio de Janeiro,-22.9268,-43.1941,1.428,0,0.0
+UC-0058,cust-058,MED-0058,AL-05,comercial,Rio de Janeiro,-22.865,-43.1537,1.854,0,0.0
+UC-0059,cust-059,MED-0059,AL-05,comercial,Rio de Janeiro,-22.8721,-43.1556,1.556,0,0.0
+UC-0060,cust-060,MED-0060,AL-05,comercial,Rio de Janeiro,-22.9329,-43.1469,0.978,0,0.0
