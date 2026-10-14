@@ -19,8 +19,11 @@ services:
       SIM_UPDATE_S: "${SIM_UPDATE_S:-5}"           # recalculo do modelo
       AUTO_FAULT: "${AUTO_FAULT:-true}"            # injeta falha sozinho
       AUTO_FAULT_PROB: "${AUTO_FAULT_PROB:-0.05}"
+      CYBER_FAULT_PROB: "${CYBER_FAULT_PROB:-0.25}"  # fracao das falhas que e cyber
+      MQTT_HOST: "mosquitto"                       # eventos de seguranca/operacao
     ports:
       - "8091:8080"     # HTTP de controle (fault/snapshot), so pra operar o lab
+    depends_on: [mosquitto]
     restart: unless-stopped
     networks: [ot-net]
 

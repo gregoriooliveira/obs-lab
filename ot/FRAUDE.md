@@ -30,8 +30,9 @@ já nasce como caso coordenado (furta no medidor E é conta do portal).
 - Comando não autorizado (abrir disjuntor remoto — Ucrânia 2015).
 - Spoofing de telemetria Modbus (protocolo sem autenticação).
 - Medidor inteligente comprometido mandando leitura mentirosa.
-- Sinal no lab: faults `unauth_command`/`spoof` no `process-sim` → evento índice `ot`
-  **(a fazer — ver Pendências).**
+- Sinal no lab: faults `unauth_command`/`spoof` no `process-sim` → evento no índice
+  `ot`. O spoof congela a leitura do alimentador enquanto a carga real anda, e a
+  incoerência aparece no balanço `Σ alimentadores ≠ total da subestação`.
 
 **3. Insider / operação indevida** — operador abre alimentador fora de janela.
 
@@ -66,11 +67,18 @@ Score de fraude por UC combina os dois lados:
 UC com sinal **nos dois mundos** = fraude coordenada → topo da fila. É a leitura
 que nenhum dos dois centros isolados enxerga.
 
-## Pendências (quando os índices `ot`/`ot_metrics` existirem e o dado fluir)
+## Feito
+
+- Furto/tamper nos medidores (`meter-sim`) + balanço de perda não-técnica.
+- Faults cyber (`unauth_command`, `spoof`) no `process-sim`, com evento no índice `ot`.
+- Eventos (segurança/operação/tamper) roteados por MQTT → Telegraf → índice `ot`.
+- Cenário coordenado no load-gen de TI (`fraudCoordinated`): fraude no portal nas
+  contas `cust-001/014/019/037/054` — exatamente as UCs que furtam no OT.
+
+## Pendências (precisam dos índices `ot`/`ot_metrics` e do dado fluindo)
 
 - View `obs_lab_ot_fusion` (Dashboard Studio): mapa por UC, perda por alimentador,
   fila de UCs coordenadas, drill TI↔OT.
-- Roteamento do evento `ot/energia/evento/tamper` (MQTT) para o índice `ot`.
-- Faults cyber (`unauth_command`, `spoof`) no `process-sim` + evento no índice `ot`.
-- Cenário coordenado no load-gen de TI (ATO nas contas `cust-001/0NN` que furtam),
-  pra o caso coordenado aparecer sempre, não só por acaso.
+- Criar os índices `ot` (eventos) e `ot_metrics` (métrica) e o token HEC que
+  permite os dois.
+- Validar ao vivo o balanço e os eventos no Splunk (só com a VM OT no ar).

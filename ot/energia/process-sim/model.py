@@ -39,9 +39,11 @@ class Feeder:
         self.__dict__.update(cfg)
         self.offset = offset          # defasagem na curva, pra nao picarem juntos
         self.status = 1               # 1 ligado, 0 desligado (trip)
-        self.fault = None             # None | "overload" | "sag" | "trip"
+        self.fault = None             # None | "overload" | "sag" | "trip" | "spoof"
         self.fault_until = 0.0
-        self._cur = {}
+        self._cur = {}                # o que vai pro Modbus (pode ser spoofado)
+        self._real = {}               # a grandeza fisica de verdade (nunca spoofada)
+        self._spoof_frozen = None     # leitura congelada durante o spoof
 
     def _load_factor(self, day_frac):
         base = _daily_shape((day_frac + self.offset) % 1.0)
@@ -50,12 +52,14 @@ class Feeder:
     def update(self, day_frac, vsrc_pu, now):
         if self.fault and now >= self.fault_until:
             self.fault = None
-            if self.status == 0 and self.fault is None:
+            self._spoof_frozen = None
+            if self.status == 0:
                 self.status = 1       # religa depois do trip
 
         if self.status == 0:
-            self._cur = dict(tensao_pu=0.0, corrente_a=0.0, potencia_kw=0.0,
-                             potencia_kvar=0.0, carga_pct=0.0, status=0.0)
+            self._real = dict(tensao_pu=0.0, corrente_a=0.0, potencia_kw=0.0,
+                              potencia_kvar=0.0, carga_pct=0.0, status=0.0)
+            self._cur = dict(self._real)
             return self._cur
 
         lf = self._load_factor(day_frac)
@@ -75,17 +79,31 @@ class Feeder:
         v_ll_v = VLL_KV * 1000.0 * max(v_end, 0.5)
         i_a = s_kva * 1000.0 / (math.sqrt(3) * v_ll_v)
 
-        self._cur = dict(
+        # grandeza FISICA de verdade (vai pro total da subestacao, medido no barramento)
+        self._real = dict(
             tensao_pu=round(v_end, 4), corrente_a=round(i_a, 1),
             potencia_kw=round(p_kw, 1), potencia_kvar=round(q_kvar, 1),
             carga_pct=round(carga_pct, 1), status=1.0,
         )
+        # o que o alimentador REPORTA no Modbus. No spoof, congela numa leitura
+        # benigna enquanto a carga real segue a curva -> o reportado nao bate com
+        # o total da subestacao (a assinatura do spoofing de telemetria).
+        if self.fault == "spoof":
+            if self._spoof_frozen is None:
+                self._spoof_frozen = dict(self._real)
+            self._cur = dict(self._spoof_frozen, status=1.0)
+        else:
+            self._cur = dict(self._real)
         return self._cur
 
     def inject(self, tipo, dur_s, now):
-        self.fault = tipo
+        # unauth_command e, eletricamente, um trip (disjuntor abre); a diferenca
+        # e a ORIGEM (comando nao autorizado), que o server classifica como evento
+        # de seguranca. Aqui tratamos o efeito eletrico.
+        efeito = "trip" if tipo == "unauth_command" else tipo
+        self.fault = efeito
         self.fault_until = now + dur_s
-        if tipo == "trip":
+        if efeito == "trip":
             self.status = 0
 
 
@@ -104,13 +122,16 @@ class Substation:
         now = now or time.time()
         self.vsrc_pu = 0.94 if now < self.sag_until else round(random.uniform(0.99, 1.01), 4)
         df = self.day_frac(now)
-        fs = [f.update(df, self.vsrc_pu, now) for f in self.feeders]
-        ativos = sum(1 for f in fs if f["status"] == 1.0)
+        fs = [f.update(df, self.vsrc_pu, now) for f in self.feeders]   # reportado
+        real = [f._real for f in self.feeders]                          # fisico
+        ativos = sum(1 for r in real if r["status"] == 1.0)
+        # a subestacao mede no barramento (grandeza real); os alimentadores reportam
+        # o _cur (que o spoof pode falsear). Σ alimentador != total => incoerencia.
         return {
             "subestacao": {
                 "tensao_entrada_kv": round(VLL_KV * self.vsrc_pu, 3),
-                "potencia_total_mw": round(sum(f["potencia_kw"] for f in fs) / 1000.0, 3),
-                "potencia_total_mvar": round(sum(f["potencia_kvar"] for f in fs) / 1000.0, 3),
+                "potencia_total_mw": round(sum(r["potencia_kw"] for r in real) / 1000.0, 3),
+                "potencia_total_mvar": round(sum(r["potencia_kvar"] for r in real) / 1000.0, 3),
                 "frequencia_hz": round(60.0 + random.uniform(-0.03, 0.03), 3),
                 "alimentadores_ativos": float(ativos),
                 "hora_do_dia": round(df * 24.0, 2),
@@ -153,6 +174,29 @@ if __name__ == "__main__":
     s.inject("subestacao", "sag", 15, now=base + 300)
     snap = s.update(now=base + 305)
     assert snap["subestacao"]["tensao_entrada_kv"] < VLL_KV * 0.96, "sag nao caiu"
+
+    # cyber: unauth_command abre o disjuntor (eletricamente = trip)
+    s2 = Substation(day_minutes=20.0)
+    b2 = s2.t0
+    s2.inject("AL-01", "unauth_command", 30, now=b2 + 10)
+    snap = s2.update(now=b2 + 15)
+    assert snap["alimentadores"]["AL-01"]["status"] == 0.0, "unauth_command nao abriu"
+
+    # cyber: spoof congela a leitura do alimentador enquanto a carga real anda ->
+    # a soma dos alimentadores reportados descola do total medido na subestacao
+    s3 = Substation(day_minutes=20.0)
+    b3 = s3.t0
+    s3.update(now=b3 + 0)
+    s3.inject("AL-05", "spoof", 600, now=b3 + 5)
+    r1 = s3.update(now=b3 + 10)["alimentadores"]["AL-05"]["potencia_kw"]
+    snap = s3.update(now=b3 + 400)          # bem mais tarde no "dia"
+    r2 = snap["alimentadores"]["AL-05"]["potencia_kw"]
+    assert r1 == r2, "spoof nao congelou o reportado"
+    soma_rep = sum(f["potencia_kw"] for f in snap["alimentadores"].values())
+    total_real_kw = snap["subestacao"]["potencia_total_mw"] * 1000.0
+    assert abs(soma_rep - total_real_kw) > 1.0, "spoof nao gerou incoerencia SE vs alimentadores"
+    print(f"ok - unauth_command abre; spoof congela ({r1:.0f} kW) e descola "
+          f"{abs(soma_rep-total_real_kw):.0f} kW do total da subestacao")
     print(f"ok - tensao fim de alimentador variou {vmin:.3f}..{vmax:.3f} pu no dia")
     print("pico MW:", max(
         Substation(day_minutes=20).update(now=base + t)["subestacao"]["potencia_total_mw"]

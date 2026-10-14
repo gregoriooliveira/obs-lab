@@ -63,10 +63,11 @@ def ciclo(client):
         if r["tamper"] != tamper_anterior.get(uc, False):
             tamper_anterior[uc] = r["tamper"]
             if r["tamper"]:
-                ev = {"evento": "medidor_tamper", "uc": uc, "medidor": r["medidor"],
+                ev = {"evento": "medidor_tamper", "categoria": "seguranca",
+                      "uc": uc, "medidor": r["medidor"],
                       "conta_portal": r["conta_portal"], "alimentador": r["alimentador"],
                       "classe": r["classe"], "severidade": "high",
-                      "msg": "flag de adulteracao no medidor"}
+                      "msg": "flag de adulteracao no medidor", "valor": 1}
                 client.publish(f"{TOPIC_EVT}/tamper", json.dumps(ev), qos=0)
                 print(f"[tamper] {uc} ({r['conta_portal']})", flush=True)
 

@@ -39,11 +39,17 @@ curl -X POST "http://<host>:8091/fault?feeder=AL-03&tipo=trip&dur=20"
 curl -X POST "http://<host>:8091/fault?feeder=subestacao&tipo=sag&dur=15"
 ```
 
-| Tipo | Efeito |
-|---|---|
-| `overload` | carga > 100 %, corrente alta, tensão afunda |
-| `trip` | alimentador desliga (status 0, V/I/P = 0), religa no fim |
-| `sag` | afundamento de tensão na subestação (só `feeder=subestacao`) |
+| Tipo | Categoria | Efeito |
+|---|---|---|
+| `overload` | operação | carga > 100 %, corrente alta, tensão afunda |
+| `trip` | operação | alimentador desliga (status 0, V/I/P = 0), religa no fim |
+| `sag` | operação | afundamento de tensão na subestação (só `feeder=subestacao`) |
+| `unauth_command` | **cyber** | comando não autorizado abre o disjuntor (eletricamente = trip, mas evento de segurança `critical`) |
+| `spoof` | **cyber** | telemetria do alimentador **congela** numa leitura benigna enquanto a carga real anda → Σ alimentadores descola do total da subestação (a assinatura do spoofing) |
+
+Cada falha emite um **evento** em `ot/energia/evento/<categoria>` (MQTT) →
+Telegraf → índice `ot`. `CYBER_FAULT_PROB` controla quanto do auto-fault é ataque.
+Eventos recentes: `curl http://<host>:8091/events`.
 
 ## Mapa de registradores (holding, FLOAT32 ABCD, 2 regs cada)
 

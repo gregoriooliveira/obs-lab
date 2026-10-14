@@ -23,6 +23,11 @@ from pymodbus.datastore import (ModbusSequentialDataBlock, ModbusServerContext,
                                 ModbusSlaveContext)
 from pymodbus.server import StartTcpServer
 
+try:
+    import paho.mqtt.client as mqtt       # eventos (indice ot). Opcional: sem
+except Exception:                          # broker o sim roda igual, so loga.
+    mqtt = None
+
 from model import FEEDERS, Substation
 
 DAY_MIN    = float(os.environ.get("SIM_DAY_MINUTES", "20"))
@@ -31,11 +36,76 @@ MODBUS_PORT = int(os.environ.get("MODBUS_PORT", "502"))
 HTTP_PORT   = int(os.environ.get("HTTP_PORT", "8080"))
 AUTO_FAULT  = os.environ.get("AUTO_FAULT", "true") == "true"
 AUTO_PROB   = float(os.environ.get("AUTO_FAULT_PROB", "0.05"))  # por update
+CYBER_PROB  = float(os.environ.get("CYBER_FAULT_PROB", "0.25")) # fracao cyber
+MQTT_HOST   = os.environ.get("MQTT_HOST", "mosquitto")
+MQTT_PORT   = int(os.environ.get("MQTT_PORT", "1883"))
 
 sub = Substation(day_minutes=DAY_MIN)
 last_snapshot = {}
 FEEDER_IDS = [f["id"] for f in FEEDERS]
 FAULTS = ["overload", "sag", "trip"]
+
+# Classificacao do evento por tipo de falha. unauth_command e spoof sao ataque
+# (vao com severidade de seguranca); trip/overload/sag sao operacao normal.
+EVENTOS = {
+    "unauth_command": ("seguranca", "critical", "comando de abertura nao autorizado no disjuntor"),
+    "spoof":          ("seguranca", "high",     "telemetria do alimentador falseada (leitura congelada)"),
+    "trip":           ("operacao",  "medium",   "disjuntor abriu por protecao"),
+    "overload":       ("operacao",  "medium",   "sobrecarga no alimentador"),
+    "sag":            ("operacao",  "low",      "afundamento de tensao na subestacao"),
+}
+_mqc = None
+eventos = []     # ultimos eventos, pro /events
+
+
+def mqtt_conectar():
+    """Conecta ao broker em background, com retentativa. Nunca bloqueia o Modbus:
+    se o broker nao subir, os eventos saem so no log."""
+    global _mqc
+    if mqtt is None:
+        print("[process-sim] paho ausente; eventos so no log", flush=True)
+        return
+    c = mqtt.Client(client_id="process-sim-energia")
+    c.reconnect_delay_set(min_delay=1, max_delay=15)
+    _mqc = c
+
+    def _try():
+        for _ in range(60):
+            try:
+                c.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
+                c.loop_start()
+                print(f"[process-sim] MQTT {MQTT_HOST}:{MQTT_PORT} ok", flush=True)
+                return
+            except Exception:
+                time.sleep(2)
+        print("[process-sim] MQTT nao conectou; eventos so no log", flush=True)
+
+    threading.Thread(target=_try, daemon=True).start()
+
+
+def emit_event(ev):
+    ev["ts"] = time.time()
+    eventos.append(ev)
+    del eventos[:-200]
+    cat = ev.get("categoria", "operacao")
+    print(f"[evento:{cat}] {ev.get('feeder')} {ev.get('tipo')} {ev.get('severidade')}", flush=True)
+    if _mqc is not None:
+        try:
+            _mqc.publish(f"ot/energia/evento/{cat}", json.dumps(ev), qos=0)
+        except Exception:
+            pass
+
+
+def do_inject(alvo, tipo, dur):
+    """Aplica a falha E emite o evento classificado. Usado pelo auto-fault e pelo
+    /fault, pra operacao e ataque sairem pelo mesmo caminho."""
+    ok = sub.inject(alvo, tipo, dur)
+    if ok:
+        cat, sev, msg = EVENTOS.get(tipo, ("operacao", "low", tipo))
+        emit_event({"evento": f"ot_{tipo}", "categoria": cat, "severidade": sev,
+                    "feeder": alvo, "tipo": tipo, "dur_s": dur, "msg": msg,
+                    "valor": 1})   # campo numerico: o parser json do Telegraf exige um
+    return ok
 
 
 def floats_to_regs(values):
@@ -65,11 +135,13 @@ def updater(ctx):
         last_snapshot = snap
         write_snapshot(ctx, snap)
         if AUTO_FAULT and random.random() < AUTO_PROB:
-            alvo = random.choice(FEEDER_IDS + ["subestacao"])
-            tipo = "sag" if alvo == "subestacao" else random.choice(FAULTS)
-            dur = random.randint(20, 60)
-            sub.inject(alvo, tipo, dur)
-            print(f"[auto-fault] {alvo} {tipo} {dur}s", flush=True)
+            if random.random() < CYBER_PROB:            # uma fracao e ataque cyber
+                alvo = random.choice(FEEDER_IDS)
+                tipo = random.choice(["unauth_command", "spoof"])
+            else:                                        # o resto e operacao
+                alvo = random.choice(FEEDER_IDS + ["subestacao"])
+                tipo = "sag" if alvo == "subestacao" else random.choice(FAULTS)
+            do_inject(alvo, tipo, random.randint(20, 60))
         time.sleep(UPDATE_S)
 
 
@@ -91,6 +163,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"status": "ok", "service": "process-sim-energia"})
         elif p == "/snapshot":
             self._send(200, last_snapshot)
+        elif p == "/events":
+            self._send(200, {"eventos": eventos[-50:]})
         else:
             self._send(404, {"error": "not found"})
 
@@ -100,9 +174,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, {"error": "not found"})
         q = parse_qs(u.query)
         feeder = q.get("feeder", ["AL-01"])[0]
-        tipo = q.get("tipo", ["overload"])[0]
+        tipo = q.get("tipo", ["overload"])[0]   # overload|trip|sag|unauth_command|spoof
         dur = int(q.get("dur", ["30"])[0])
-        ok = sub.inject(feeder, tipo, dur)
+        ok = do_inject(feeder, tipo, dur)
         self._send(200 if ok else 400,
                    {"status": "fault injected" if ok else "alvo invalido",
                     "feeder": feeder, "tipo": tipo, "dur_s": dur})
@@ -113,6 +187,7 @@ def main():
     slave = ModbusSlaveContext(hr=block)
     context = ModbusServerContext(slaves=slave, single=True)
 
+    mqtt_conectar()
     threading.Thread(target=updater, args=(slave,), daemon=True).start()
     threading.Thread(
         target=lambda: ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler).serve_forever(),

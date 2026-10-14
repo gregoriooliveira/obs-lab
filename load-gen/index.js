@@ -236,8 +236,26 @@ async function fraudCardCycling() {
     record('fraud_card_cycling', r.status, r.ms);
   }
 }
+// Fraude coordenada TI<->OT. Estas contas sao as UCs que FURTAM energia no lab
+// OT (obs_lab_uc.csv: UC-0001/0014/0019/0037/0054 = cust-001/014/019/037/054).
+// Aqui a mesma conta sofre fraude no portal: aparelho novo + cartoes roubados
+// quitando a fatura, de IP suspeito. O Fusion liga os dois mundos pela UC - o
+// caso que nenhum dos dois centros isolados enxerga.
+const COORD_UC = ['cust-001', 'cust-014', 'cust-019', 'cust-037', 'cust-054'];
+async function fraudCoordinated() {
+  const customerId = rand(COORD_UC);
+  const device = `dev-coord-${Math.random().toString(36).slice(2, 8)}`;
+  const hdrs = { ...xff(ACTORS.cardCycling), 'X-Device-Id': device };
+  for (let i = 0; i < 4; i++) {
+    const r = await req('POST', '/api/checkout', {
+      items: [{ productId: 'prod-003', qty: 1, price: CATALOGUE['prod-003'] }],
+      customerId, paymentMethod: 'card', cardFingerprint: `card-stolen-${device}-${i}`,
+    }, hdrs);
+    record('fraud_coordinated', r.status, r.ms);
+  }
+}
 async function fraudRun() {
-  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO, fraudStuffing, fraudCardCycling];
+  const attacks = [fraudScraping, fraudTampering, fraudCardTesting, fraudVelocity, fraudBruteForce, fraudATO, fraudStuffing, fraudCardCycling, fraudCoordinated];
   await rand(attacks)();
 }
 
