@@ -102,8 +102,11 @@ def do_inject(alvo, tipo, dur):
     ok = sub.inject(alvo, tipo, dur)
     if ok:
         cat, sev, msg = EVENTOS.get(tipo, ("operacao", "low", tipo))
+        # o modelo usa "estacao" como alvo; no evento emite o ID real (ETA-) pra o
+        # Splunk derivar o setor pelo prefixo (macro obs_lab_ot_setor).
+        feeder = "ETA-Central" if alvo == "estacao" else alvo
         emit_event({"evento": f"ot_{tipo}", "categoria": cat, "severidade": sev,
-                    "feeder": alvo, "tipo": tipo, "dur_s": dur, "msg": msg,
+                    "feeder": feeder, "tipo": tipo, "dur_s": dur, "msg": msg,
                     "valor": 1})   # campo numerico: o parser json do Telegraf exige um
     return ok
 

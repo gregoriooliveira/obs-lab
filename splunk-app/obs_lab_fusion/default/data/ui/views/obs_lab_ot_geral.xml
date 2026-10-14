@@ -44,7 +44,7 @@
     "ds_ev_recentes": {
       "type": "ds.search",
       "name": "ds_ev_recentes",
-      "options": { "query": "`obs_lab_ot_eventos` | `obs_lab_ot_setor` | eval ent=coalesce(uc,ativo,feeder), hora=strftime(_time,\"%H:%M:%S\") | sort - _time | head 30 | table hora, setor, categoria, severidade, feeder, ent, tipo, msg" }
+      "options": { "query": "`obs_lab_ot_eventos` | `obs_lab_ot_setor` | eval ent=coalesce(uc,ativo,feeder,linha), hora=strftime(_time,\"%H:%M:%S\") | sort - _time | head 30 | table hora, setor, categoria, severidade, ent, tipo, msg" }
     },
     "ds_coord": {
       "type": "ds.search",
