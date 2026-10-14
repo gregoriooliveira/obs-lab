@@ -1,0 +1,56 @@
+uc,conta_portal,medidor,zona,classe,cidade,lat,lon,peso,furto,desvio
+UC-G0001,cust-001,MEG-0001,GS-01,comercial,Sao Paulo,-23.5272,-46.6625,1.943,0,0.0
+UC-G0002,cust-002,MEG-0002,GS-01,comercial,Sao Paulo,-23.5193,-46.6209,1.383,0,0.0
+UC-G0003,cust-003,MEG-0003,GS-01,comercial,Sao Paulo,-23.5642,-46.6274,1.98,0,0.0
+UC-G0004,cust-004,MEG-0004,GS-01,comercial,Sao Paulo,-23.5066,-46.6364,1.357,0,0.0
+UC-G0005,cust-005,MEG-0005,GS-01,comercial,Sao Paulo,-23.5557,-46.653,1.037,1,0.533
+UC-G0006,cust-006,MEG-0006,GS-01,comercial,Sao Paulo,-23.5159,-46.6095,2.208,0,0.0
+UC-G0007,cust-007,MEG-0007,GS-01,comercial,Sao Paulo,-23.5497,-46.6175,1.762,0,0.0
+UC-G0008,cust-008,MEG-0008,GS-01,comercial,Sao Paulo,-23.5685,-46.6536,1.5,0,0.0
+UC-G0009,cust-009,MEG-0009,GS-01,comercial,Sao Paulo,-23.5799,-46.6726,1.39,0,0.0
+UC-G0010,cust-010,MEG-0010,GS-01,comercial,Sao Paulo,-23.5889,-46.6702,2.053,0,0.0
+UC-G0011,cust-011,MEG-0011,GS-02,industrial,Campinas,-22.9552,-47.0823,4.03,0,0.0
+UC-G0012,cust-012,MEG-0012,GS-02,industrial,Campinas,-22.8703,-47.0129,2.016,0,0.0
+UC-G0013,cust-013,MEG-0013,GS-02,industrial,Campinas,-22.8646,-47.0957,3.737,0,0.0
+UC-G0014,cust-014,MEG-0014,GS-02,industrial,Campinas,-22.8615,-47.0371,3.765,0,0.0
+UC-G0015,cust-015,MEG-0015,GS-02,industrial,Campinas,-22.9238,-47.0725,3.459,0,0.0
+UC-G0016,cust-016,MEG-0016,GS-02,industrial,Campinas,-22.9466,-47.0896,4.075,0,0.0
+UC-G0017,cust-017,MEG-0017,GS-02,industrial,Campinas,-22.9081,-47.1095,4.184,0,0.0
+UC-G0018,cust-018,MEG-0018,GS-02,industrial,Campinas,-22.9331,-47.1012,3.095,0,0.0
+UC-G0019,cust-019,MEG-0019,GS-02,industrial,Campinas,-22.8826,-47.0609,2.035,0,0.0
+UC-G0020,cust-020,MEG-0020,GS-02,industrial,Campinas,-22.9241,-47.0837,2.071,0,0.0
+UC-G0021,cust-021,MEG-0021,GS-02,industrial,Campinas,-22.9024,-47.0147,1.842,1,0.53
+UC-G0022,cust-022,MEG-0022,GS-02,industrial,Campinas,-22.959,-47.0356,2.315,1,0.616
+UC-G0023,cust-023,MEG-0023,GS-02,industrial,Campinas,-22.9284,-47.0873,4.18,0,0.0
+UC-G0024,cust-024,MEG-0024,GS-02,industrial,Campinas,-22.9317,-47.0886,2.03,0,0.0
+UC-G0025,cust-025,MEG-0025,GS-02,industrial,Campinas,-22.8872,-47.0514,2.378,0,0.0
+UC-G0026,cust-026,MEG-0026,GS-02,industrial,Campinas,-22.8886,-47.0736,3.075,0,0.0
+UC-G0027,cust-027,MEG-0027,GS-02,industrial,Campinas,-22.934,-47.095,3.681,0,0.0
+UC-G0028,cust-028,MEG-0028,GS-02,industrial,Campinas,-22.9382,-47.1077,2.891,0,0.0
+UC-G0029,cust-029,MEG-0029,GS-03,residencial,Belo Horizonte,-19.9112,-43.9428,1.09,0,0.0
+UC-G0030,cust-030,MEG-0030,GS-03,residencial,Belo Horizonte,-19.9034,-43.9199,0.606,1,0.446
+UC-G0031,cust-031,MEG-0031,GS-03,residencial,Belo Horizonte,-19.8826,-43.8905,1.233,0,0.0
+UC-G0032,cust-032,MEG-0032,GS-03,residencial,Belo Horizonte,-19.9435,-43.9062,1.243,0,0.0
+UC-G0033,cust-033,MEG-0033,GS-03,residencial,Belo Horizonte,-19.9624,-43.9114,0.994,0,0.0
+UC-G0034,cust-034,MEG-0034,GS-03,residencial,Belo Horizonte,-19.933,-43.9311,1.391,0,0.0
+UC-G0035,cust-035,MEG-0035,GS-03,residencial,Belo Horizonte,-19.9283,-43.9614,0.991,0,0.0
+UC-G0036,cust-036,MEG-0036,GS-03,residencial,Belo Horizonte,-19.9303,-43.9666,1.373,0,0.0
+UC-G0037,cust-037,MEG-0037,GS-03,residencial,Belo Horizonte,-19.939,-43.9509,0.685,0,0.0
+UC-G0038,cust-038,MEG-0038,GS-03,residencial,Belo Horizonte,-19.9476,-43.9318,1.264,1,0.485
+UC-G0039,cust-039,MEG-0039,GS-03,residencial,Belo Horizonte,-19.9527,-43.9129,0.91,0,0.0
+UC-G0040,cust-040,MEG-0040,GS-03,residencial,Belo Horizonte,-19.8703,-43.905,0.857,0,0.0
+UC-G0041,cust-041,MEG-0041,GS-03,residencial,Belo Horizonte,-19.9423,-43.9664,0.948,0,0.0
+UC-G0042,cust-042,MEG-0042,GS-04,rural,Porto Alegre,-30.0727,-51.2248,0.727,0,0.0
+UC-G0043,cust-043,MEG-0043,GS-04,rural,Porto Alegre,-30.0749,-51.2016,0.59,0,0.0
+UC-G0044,cust-044,MEG-0044,GS-04,rural,Porto Alegre,-30.038,-51.1903,0.673,0,0.0
+UC-G0045,cust-045,MEG-0045,GS-04,rural,Porto Alegre,-30.0578,-51.2478,1.023,0,0.0
+UC-G0046,cust-046,MEG-0046,GS-04,rural,Porto Alegre,-30.0699,-51.2557,0.776,0,0.0
+UC-G0047,cust-047,MEG-0047,GS-04,rural,Porto Alegre,-30.0613,-51.1872,0.853,0,0.0
+UC-G0048,cust-048,MEG-0048,GS-05,comercial,Rio de Janeiro,-22.9402,-43.2087,1.706,0,0.0
+UC-G0049,cust-049,MEG-0049,GS-05,comercial,Rio de Janeiro,-22.8984,-43.1362,1.816,0,0.0
+UC-G0050,cust-050,MEG-0050,GS-05,comercial,Rio de Janeiro,-22.9136,-43.1606,1.909,0,0.0
+UC-G0051,cust-051,MEG-0051,GS-05,comercial,Rio de Janeiro,-22.8682,-43.2104,1.401,0,0.0
+UC-G0052,cust-052,MEG-0052,GS-05,comercial,Rio de Janeiro,-22.9036,-43.2027,1.372,0,0.0
+UC-G0053,cust-053,MEG-0053,GS-05,comercial,Rio de Janeiro,-22.8969,-43.1999,1.756,0,0.0
+UC-G0054,cust-054,MEG-0054,GS-05,comercial,Rio de Janeiro,-22.9484,-43.2043,1.369,0,0.0
+UC-G0055,cust-055,MEG-0055,GS-05,comercial,Rio de Janeiro,-22.9058,-43.21,1.345,0,0.0

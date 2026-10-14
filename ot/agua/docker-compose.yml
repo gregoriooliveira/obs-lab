@@ -1,0 +1,86 @@
+# Stack OT - setor AGUA (saneamento/distribuicao). Autocontido: o process-sim gera
+# o proprio dado, nada depende de equipamento real. Mesmo padrao da energia -
+# credenciais do Splunk por env var, nunca na imagem.
+#
+#   process-sim  modelo hidraulico -> Modbus TCP (502) + HTTP de controle (8080)
+#   meter-sim    hidrometros -> consumo por MQTT (furto/tamper)
+#   mosquitto    broker MQTT (hidrometros -> Telegraf)
+#   telegraf     le Modbus + MQTT e manda pro Splunk HEC como metrica (ot_metrics)
+#   fuxa         HMI/SCADA web (1881) lendo o mesmo Modbus
+#
+# Portas de host desencontradas da energia (8093/8094/1882), pra os dois setores
+# rodarem na mesma VM sem colisao. Modbus 502 e MQTT ficam internos a rede.
+name: obs-lab-ot-agua
+
+services:
+  process-sim:
+    build: { context: ./process-sim }
+    image: obs-lab-ot-agua-sim:latest
+    container_name: ot-agua-sim
+    environment:
+      SIM_DAY_MINUTES: "${SIM_DAY_MINUTES:-20}"   # curva de consumo acelerada (vistoso)
+      SIM_UPDATE_S: "${SIM_UPDATE_S:-5}"           # recalculo do modelo
+      AUTO_FAULT: "${AUTO_FAULT:-true}"            # injeta falha sozinho
+      AUTO_FAULT_PROB: "${AUTO_FAULT_PROB:-0.05}"
+      CYBER_FAULT_PROB: "${CYBER_FAULT_PROB:-0.25}"  # fracao das falhas que e cyber
+      MQTT_HOST: "mosquitto"                       # eventos de seguranca/operacao
+    ports:
+      - "8093:8080"     # HTTP de controle (fault/snapshot), so pra operar o lab
+    depends_on: [mosquitto]
+    restart: unless-stopped
+    networks: [ot-net]
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ot-agua-mqtt
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+    networks: [ot-net]
+
+  meter-sim:
+    build: { context: ., dockerfile: meter-sim/Dockerfile }   # precisa de lookups/
+    image: obs-lab-ot-agua-meter:latest
+    container_name: ot-agua-meter
+    environment:
+      PROCESS_SIM_URL: "http://process-sim:8080"   # le o consumo dos setores
+      MQTT_HOST: "mosquitto"
+      METER_POLL_S: "${METER_POLL_S:-5}"
+    ports:
+      - "8094:8080"     # HTTP de controle (fraude/snapshot), so pra operar o lab
+    depends_on: [process-sim, mosquitto]
+    restart: unless-stopped
+    networks: [ot-net]
+
+  telegraf:
+    image: telegraf:1.32
+    container_name: ot-agua-telegraf
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    environment:
+      OT_POLL_INTERVAL: "${OT_POLL_INTERVAL:-5s}"  # realista de SCADA
+      SPLUNK_HEC_URL: "${SPLUNK_HEC_URL}"
+      SPLUNK_HEC_TOKEN: "${SPLUNK_HEC_TOKEN}"
+    depends_on: [process-sim, mosquitto]
+    restart: unless-stopped
+    networks: [ot-net]
+
+  fuxa:
+    image: frangoteam/fuxa:latest
+    container_name: ot-agua-hmi
+    ports:
+      - "1882:1881"     # HMI web: http://<host>:1882
+    volumes:
+      - fuxa-appdata:/usr/src/app/FUXA/server/_appdata
+      - fuxa-db:/usr/src/app/FUXA/server/_db
+    depends_on: [process-sim]
+    restart: unless-stopped
+    networks: [ot-net]
+
+networks:
+  ot-net:
+    driver: bridge
+
+volumes:
+  fuxa-appdata:
+  fuxa-db:

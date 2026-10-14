@@ -1,0 +1,51 @@
+ativo,conta_portal,medidor,linha,tipo,cidade,lat,lon,peso,furto,desvio
+AT-0001,cust-001,MED-0001,IN-01,linha,Sao Paulo,-23.5412,-46.6545,1.479,0,0.0
+AT-0002,cust-002,MED-0002,IN-01,motor,Sao Paulo,-23.5171,-46.6438,1.074,0,0.0
+AT-0003,cust-003,MED-0003,IN-01,motor,Sao Paulo,-23.5568,-46.6205,1.194,1,0.595
+AT-0004,cust-004,MED-0004,IN-01,motor,Sao Paulo,-23.5238,-46.5994,1.441,0,0.0
+AT-0005,cust-005,MED-0005,IN-01,motor,Sao Paulo,-23.5841,-46.6523,1.327,0,0.0
+AT-0006,cust-006,MED-0006,IN-01,motor,Sao Paulo,-23.5241,-46.6616,0.85,0,0.0
+AT-0007,cust-007,MED-0007,IN-01,motor,Sao Paulo,-23.5797,-46.6339,1.328,0,0.0
+AT-0008,cust-008,MED-0008,IN-01,motor,Sao Paulo,-23.5863,-46.6162,0.824,0,0.0
+AT-0009,cust-009,MED-0009,IN-01,motor,Sao Paulo,-23.5431,-46.6213,0.925,0,0.0
+AT-0010,cust-010,MED-0010,IN-01,motor,Sao Paulo,-23.5566,-46.6162,1.327,0,0.0
+AT-0011,cust-011,MED-0011,IN-02,linha,Campinas,-22.9124,-47.0257,1.161,0,0.0
+AT-0012,cust-012,MED-0012,IN-02,motor,Campinas,-22.912,-47.0634,1.492,0,0.0
+AT-0013,cust-013,MED-0013,IN-02,motor,Campinas,-22.9305,-47.0414,0.906,1,0.323
+AT-0014,cust-014,MED-0014,IN-02,motor,Campinas,-22.8829,-47.045,1.419,1,0.644
+AT-0015,cust-015,MED-0015,IN-02,motor,Campinas,-22.9418,-47.0485,0.646,0,0.0
+AT-0016,cust-016,MED-0016,IN-02,motor,Campinas,-22.8711,-47.0465,0.67,0,0.0
+AT-0017,cust-017,MED-0017,IN-02,motor,Campinas,-22.8711,-47.0639,1.597,0,0.0
+AT-0018,cust-018,MED-0018,IN-03,linha,Belo Horizonte,-19.958,-43.9079,1.405,0,0.0
+AT-0019,cust-019,MED-0019,IN-03,motor,Belo Horizonte,-19.8837,-43.9637,0.797,0,0.0
+AT-0020,cust-020,MED-0020,IN-03,motor,Belo Horizonte,-19.8871,-43.9127,0.639,0,0.0
+AT-0021,cust-021,MED-0021,IN-03,motor,Belo Horizonte,-19.8802,-43.9012,0.897,0,0.0
+AT-0022,cust-022,MED-0022,IN-03,motor,Belo Horizonte,-19.9569,-43.9564,1.101,0,0.0
+AT-0023,cust-023,MED-0023,IN-04,linha,Porto Alegre,-30.0331,-51.2584,1.152,0,0.0
+AT-0024,cust-024,MED-0024,IN-04,motor,Porto Alegre,-30.0377,-51.2032,0.745,0,0.0
+AT-0025,cust-025,MED-0025,IN-04,motor,Porto Alegre,-30.0185,-51.2147,1.286,0,0.0
+AT-0026,cust-026,MED-0026,IN-04,motor,Porto Alegre,-30.0205,-51.2186,0.609,0,0.0
+AT-0027,cust-027,MED-0027,IN-04,motor,Porto Alegre,-30.0341,-51.2547,1.395,0,0.0
+AT-0028,cust-028,MED-0028,IN-04,motor,Porto Alegre,-30.0092,-51.2271,1.192,0,0.0
+AT-0029,cust-029,MED-0029,IN-04,motor,Porto Alegre,-30.008,-51.1978,1.549,0,0.0
+AT-0030,cust-030,MED-0030,IN-04,motor,Porto Alegre,-30.023,-51.2475,1.104,0,0.0
+AT-0031,cust-031,MED-0031,IN-04,motor,Porto Alegre,-30.0423,-51.2313,1.424,0,0.0
+AT-0032,cust-032,MED-0032,IN-04,motor,Porto Alegre,-30.0152,-51.2478,1.315,0,0.0
+AT-0033,cust-033,MED-0033,IN-04,motor,Porto Alegre,-29.9973,-51.191,0.962,0,0.0
+AT-0034,cust-034,MED-0034,IN-04,motor,Porto Alegre,-30.0041,-51.2037,1.199,0,0.0
+AT-0035,cust-035,MED-0035,IN-05,linha,Rio de Janeiro,-22.8911,-43.1664,1.319,0,0.0
+AT-0036,cust-036,MED-0036,IN-05,motor,Rio de Janeiro,-22.9047,-43.1301,1.19,0,0.0
+AT-0037,cust-037,MED-0037,IN-05,motor,Rio de Janeiro,-22.8783,-43.1348,1.299,0,0.0
+AT-0038,cust-038,MED-0038,IN-05,motor,Rio de Janeiro,-22.9286,-43.1916,1.205,1,0.546
+AT-0039,cust-039,MED-0039,IN-05,motor,Rio de Janeiro,-22.9238,-43.1943,0.829,0,0.0
+AT-0040,cust-040,MED-0040,IN-05,motor,Rio de Janeiro,-22.8943,-43.2084,0.928,0,0.0
+AT-0041,cust-041,MED-0041,IN-05,motor,Rio de Janeiro,-22.9054,-43.1396,1.051,0,0.0
+AT-0042,cust-042,MED-0042,IN-05,motor,Rio de Janeiro,-22.9203,-43.1745,0.835,0,0.0
+AT-0043,cust-043,MED-0043,IN-05,motor,Rio de Janeiro,-22.9215,-43.1446,1.266,0,0.0
+AT-0044,cust-044,MED-0044,IN-05,motor,Rio de Janeiro,-22.9235,-43.1571,0.615,1,0.632
+AT-0045,cust-045,MED-0045,IN-05,motor,Rio de Janeiro,-22.9015,-43.1601,0.799,0,0.0
+AT-0046,cust-046,MED-0046,IN-05,motor,Rio de Janeiro,-22.9195,-43.1806,0.625,0,0.0
+AT-0047,cust-047,MED-0047,IN-05,motor,Rio de Janeiro,-22.9438,-43.2046,1.117,0,0.0
+AT-0048,cust-048,MED-0048,IN-05,motor,Rio de Janeiro,-22.8754,-43.1567,0.805,0,0.0
+AT-0049,cust-049,MED-0049,IN-05,motor,Rio de Janeiro,-22.8711,-43.1977,1.24,0,0.0
+AT-0050,cust-050,MED-0050,IN-05,motor,Rio de Janeiro,-22.8951,-43.1651,0.979,0,0.0

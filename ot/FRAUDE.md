@@ -2,9 +2,32 @@
 
 O lab de TI já tem um Fusion Center de fraude na web store (ATO, credential
 stuffing, card cycling, motor de risco). Este documento mapeia a **fraude do lado
-OT** (utilities) e como ela **se liga à TI pela mesma entidade** — a ideia de que
-a web store é o portal de atendimento de uma distribuidora e o cliente é uma
-**Unidade Consumidora (UC)** que existe nos dois mundos.
+OT** (utilities e indústria) e como ela **se liga à TI pela mesma entidade** — a
+ideia de que a web store é o portal de atendimento de uma distribuidora e o cliente
+é uma **Unidade Consumidora (UC)** que existe nos dois mundos.
+
+Abaixo o detalhe começa pela **energia** (o setor-referência); os setores **água**,
+**gás** e **indústria** seguem o mesmo molde — ver a tabela "Os quatro setores".
+
+## Os quatro setores (mesmo molde)
+
+Cada setor tem `process-sim` (físico + Modbus, com faults de operação e cyber) e
+`meter-sim` (medidores por MQTT, com furto/adulteração). O balanço `entregue −
+reportado` é a detecção central de furto em todos.
+
+| Setor | Entidade | "Furto" (subnotifica) | Balanço (entregue − reportado) | Cyber |
+|---|---|---|---|---|
+| Energia | UC / medidor | energia (gato) | alimentador − Σ medidores (kW) | unauth_command, spoof |
+| Água | UC / hidrômetro | água (gato), hidrômetro adulterado | setor − Σ hidrômetros (m³/h) | unauth (válvula), spoof, dosagem (cloro) |
+| Gás | UC / medidor | gás (bypass) | zona − Σ medidores (m³/h) | unauth (válvula), spoof, odorização off |
+| Indústria | ativo / linha | produção/OEE subnotificada | produção real − Σ contadores (pph) | unauth (parada/sabotagem), spoof (mascara dano) |
+
+**Correlação cross-setor e com a TI:** todos mandam evento pro `ot` e métrica pro
+`ot_metrics` com a mesma convenção. O caso coordenado (`obs_lab_ot_coordenada`)
+casa o tamper de **qualquer** setor com a fraude de TI pela `conta_portal` =
+`username` — um mesmo cliente pode ser fraudado em várias utilidades ao mesmo
+tempo. Painel combinado: `obs_lab_ot_geral`. Por-setor: `obs_lab_ot_fusion`
+(energia é o template do balanço).
 
 ## A entidade-ponte: a UC
 

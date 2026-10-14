@@ -1,0 +1,194 @@
+<dashboard version="2" theme="dark">
+  <label>Fusion OT geral - obs-lab</label>
+  <description>Os quatro setores OT (energia, agua, gas, industria) numa visao, e a fraude coordenada com a TI por conta.</description>
+  <definition><![CDATA[
+{
+  "title": "Fusion OT geral - obs-lab",
+  "description": "Energia + agua + gas + industria numa visao so. Eventos no index=ot (sourcetype ot:evento); o setor sai do prefixo do ID (macro obs_lab_ot_setor). A ponte com a TI e a conta (conta_portal = username). PENDENTE: balanco por setor segue o template da energia quando ot_metrics tiver dado.",
+  "dataSources": {
+    "ds_k_eventos": {
+      "type": "ds.search",
+      "name": "ds_k_eventos",
+      "options": { "query": "`obs_lab_ot_eventos` | stats count as eventos" }
+    },
+    "ds_k_cyber": {
+      "type": "ds.search",
+      "name": "ds_k_cyber",
+      "options": { "query": "`obs_lab_ot_cyber` NOT evento=*tamper* | stats count as eventos" }
+    },
+    "ds_k_tamper": {
+      "type": "ds.search",
+      "name": "ds_k_tamper",
+      "options": { "query": "`obs_lab_ot_eventos` evento=*tamper* | eval e=coalesce(uc,ativo) | stats dc(e) as entidades" }
+    },
+    "ds_k_coord": {
+      "type": "ds.search",
+      "name": "ds_k_coord",
+      "options": { "query": "`obs_lab_ot_coordenada` | stats dc(conta_portal) as casos" }
+    },
+    "ds_k_setores": {
+      "type": "ds.search",
+      "name": "ds_k_setores",
+      "options": { "query": "`obs_lab_ot_eventos` | `obs_lab_ot_setor` | stats dc(setor) as setores" }
+    },
+    "ds_mapa": {
+      "type": "ds.search",
+      "name": "ds_mapa",
+      "options": { "query": "| inputlookup obs_lab_uc | eval setor=\"energia\" | fields setor, lat, lon | append [ | inputlookup obs_lab_uc_agua | eval setor=\"agua\" | fields setor, lat, lon ] | append [ | inputlookup obs_lab_uc_gas | eval setor=\"gas\" | fields setor, lat, lon ] | append [ | inputlookup obs_lab_ativo_industria | eval setor=\"industria\" | fields setor, lat, lon ] | geostats latfield=lat longfield=lon globallimit=0 count by setor" }
+    },
+    "ds_ev_setor": {
+      "type": "ds.search",
+      "name": "ds_ev_setor",
+      "options": { "query": "`obs_lab_ot_eventos` | `obs_lab_ot_setor` | chart count over setor by categoria" }
+    },
+    "ds_ev_recentes": {
+      "type": "ds.search",
+      "name": "ds_ev_recentes",
+      "options": { "query": "`obs_lab_ot_eventos` | `obs_lab_ot_setor` | eval ent=coalesce(uc,ativo,feeder), hora=strftime(_time,\"%H:%M:%S\") | sort - _time | head 30 | table hora, setor, categoria, severidade, feeder, ent, tipo, msg" }
+    },
+    "ds_coord": {
+      "type": "ds.search",
+      "name": "ds_coord",
+      "options": { "query": "`obs_lab_ot_coordenada` | table conta_portal, setor_ot, entidades, ot_tamper, ameacas_ti, risk_ti, ti_eventos" }
+    }
+  },
+  "visualizations": {
+    "viz_titulo": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "## FUSION OT GERAL - obs-lab\nEnergia, agua, gas e industria numa visao. Cada setor manda telemetria pro `ot_metrics` e evento pro `ot` com o mesmo padrao. A fraude (furto/adulteracao/cyber) se correlaciona entre setores e com a **TI** pela conta: a web store e o portal, e o mesmo cliente pode ser fraudado em varias utilidades.",
+        "fontColor": "#e1e6eb"
+      }
+    },
+    "viz_k_eventos": {
+      "type": "splunk.singlevalue",
+      "title": "Eventos OT (todos)",
+      "dataSources": { "primary": "ds_k_eventos" },
+      "options": {}
+    },
+    "viz_k_cyber": {
+      "type": "splunk.singlevalue",
+      "title": "Ataques cyber-OT",
+      "dataSources": { "primary": "ds_k_cyber" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_tamper": {
+      "type": "splunk.singlevalue",
+      "title": "Entidades adulteradas",
+      "dataSources": { "primary": "ds_k_tamper" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_coord": {
+      "type": "splunk.singlevalue",
+      "title": "Contas coordenadas OT+TI",
+      "dataSources": { "primary": "ds_k_coord" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_setores": {
+      "type": "splunk.singlevalue",
+      "title": "Setores com evento",
+      "dataSources": { "primary": "ds_k_setores" },
+      "options": {}
+    },
+    "viz_mapa": {
+      "type": "splunk.map",
+      "title": "Unidades/ativos por setor",
+      "dataSources": { "primary": "ds_mapa" },
+      "options": {
+        "center": [ -20, -47 ],
+        "zoom": 4,
+        "baseLayerTileServer": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        "baseLayerTileServerType": "raster",
+        "layers": [
+          {
+            "type": "bubble",
+            "latitude": "> primary | seriesByName('latitude')",
+            "longitude": "> primary | seriesByName('longitude')",
+            "bubbleSize": "> primary | frameWithoutSeriesNames('_geo_bounds_east', '_geo_bounds_west', '_geo_bounds_north', '_geo_bounds_south', 'latitude', 'longitude')"
+          }
+        ]
+      }
+    },
+    "viz_ev_setor": {
+      "type": "splunk.column",
+      "title": "Eventos por setor e categoria",
+      "dataSources": { "primary": "ds_ev_setor" },
+      "options": {
+        "stackMode": "stacked",
+        "legendDisplay": "bottom",
+        "seriesColorsByField": { "seguranca": "#dc4e41", "operacao": "#5ca3ff" }
+      }
+    },
+    "viz_ev_recentes": {
+      "type": "splunk.table",
+      "title": "Eventos OT recentes",
+      "dataSources": { "primary": "ds_ev_recentes" },
+      "options": {
+        "count": 10,
+        "columnFormat": {
+          "severidade": {
+            "rowBackgroundColors": "> table | seriesByName(\"severidade\") | matchValue(sev)"
+          }
+        }
+      },
+      "context": {
+        "sev": [
+          { "match": "critical", "value": "#dc4e41" },
+          { "match": "high", "value": "#ec9960" },
+          { "match": "medium", "value": "#f8be34" },
+          { "match": "low", "value": "#53a051" }
+        ]
+      }
+    },
+    "viz_coord": {
+      "type": "splunk.table",
+      "title": "Casos coordenados OT+TI - a mesma conta fraudada no campo e no portal (pode cruzar setores)",
+      "dataSources": { "primary": "ds_coord" },
+      "options": { "count": 15 }
+    },
+    "viz_nota": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "_Setor derivado do prefixo do ID (macro `obs_lab_ot_setor`), deterministico pelos esquemas de nome. O balanco de perda nao-tecnica por setor segue o template do painel de energia (`obs_lab_ot_fusion`) quando `ot_metrics` tiver dado - confirmar o metric_name._",
+        "fontColor": "#8a9aa9"
+      }
+    }
+  },
+  "inputs": {
+    "input_tempo": {
+      "type": "input.timerange",
+      "title": "Periodo",
+      "options": { "token": "tempo", "defaultValue": "-60m@m,now" }
+    }
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": { "earliest": "$tempo.earliest$", "latest": "$tempo.latest$" }
+        }
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": { "width": 1600, "height": 1380, "display": "auto-scale" },
+    "structure": [
+      { "item": "viz_titulo", "type": "block", "position": { "x": 0, "y": 0, "w": 1600, "h": 80 } },
+      { "item": "viz_k_eventos", "type": "block", "position": { "x": 0, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_cyber", "type": "block", "position": { "x": 325, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_tamper", "type": "block", "position": { "x": 650, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_coord", "type": "block", "position": { "x": 975, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_setores", "type": "block", "position": { "x": 1300, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_mapa", "type": "block", "position": { "x": 0, "y": 210, "w": 800, "h": 430 } },
+      { "item": "viz_ev_setor", "type": "block", "position": { "x": 810, "y": 210, "w": 790, "h": 430 } },
+      { "item": "viz_ev_recentes", "type": "block", "position": { "x": 0, "y": 650, "w": 1600, "h": 300 } },
+      { "item": "viz_coord", "type": "block", "position": { "x": 0, "y": 960, "w": 1600, "h": 340 } },
+      { "item": "viz_nota", "type": "block", "position": { "x": 0, "y": 1310, "w": 1600, "h": 60 } }
+    ],
+    "globalInputs": [ "input_tempo" ]
+  }
+}
+  ]]></definition>
+  <meta type="hiddenElements"><![CDATA[{"hideEdit": false, "hideOpenInSearch": false, "hideExport": false}]]></meta>
+</dashboard>

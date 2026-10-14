@@ -1,0 +1,149 @@
+"""Transporte dos hidrometros: le o /snapshot do process-sim, roda o modelo e
+publica cada hidrometro no MQTT (o que um hidrometro inteligente/AMI faz na vida
+real). Tambem expoe um HTTP de controle pra forcar/limpar furto numa UC (o 'chaos'
+comercial do OT).
+
+Topicos MQTT:
+  ot/agua/medidor/<UC>        leitura periodica (consumo, volume, pressao, tamper)
+  ot/agua/evento/tamper       so quando uma UC levanta flag de adulteracao
+
+O Telegraf assina ot/agua/medidor/# como metrica (ot_metrics) e ot/agua/evento/#
+como evento (indice ot). Credencial do Splunk fica no Telegraf, nunca aqui - o
+meter-sim so fala MQTT e HTTP interno.
+"""
+import json
+import os
+import threading
+import time
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+import paho.mqtt.client as mqtt
+
+from model import ParqueHidrometros
+
+SIM_URL   = os.environ.get("PROCESS_SIM_URL", "http://process-sim:8080")
+MQTT_HOST = os.environ.get("MQTT_HOST", "mosquitto")
+MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
+POLL_S    = float(os.environ.get("METER_POLL_S", "5"))
+HTTP_PORT = int(os.environ.get("HTTP_PORT", "8080"))
+TOPIC_MED = "ot/agua/medidor"
+TOPIC_EVT = "ot/agua/evento"
+
+parque = ParqueHidrometros()
+ultimo = {}            # uc -> ultima leitura, pra o /snapshot de controle
+tamper_anterior = {}   # uc -> bool, pra so emitir evento na BORDA (mudou de estado)
+
+
+def snapshot_sim():
+    with urllib.request.urlopen(SIM_URL + "/snapshot", timeout=4) as r:
+        return json.loads(r.read())
+
+
+def ciclo(client):
+    global ultimo
+    try:
+        snap = snapshot_sim()
+    except Exception as e:
+        print(f"[meter-sim] process-sim indisponivel: {e}", flush=True)
+        return
+    setores = snap.get("setores", {})
+    leituras = parque.ler(setores, POLL_S)
+    agora = ultimo = {}
+    for r in leituras:
+        uc = r["uc"]
+        agora[uc] = r
+        # a perda nao-tecnica e verdade interna do lab; nao vai no fio (o hidrometro
+        # nao se denuncia). O Splunk a RECONSTROI pelo balanco setor-hidrometro.
+        payload = {k: v for k, v in r.items() if k != "perda_nao_tecnica_m3h"}
+        payload["tamper"] = int(payload["tamper"])   # 0/1: o parser json do Telegraf ignora bool
+        client.publish(f"{TOPIC_MED}/{uc}", json.dumps(payload), qos=0)
+        # evento de tamper so na transicao (liga/desliga), nao a cada leitura
+        if r["tamper"] != tamper_anterior.get(uc, False):
+            tamper_anterior[uc] = r["tamper"]
+            if r["tamper"]:
+                ev = {"evento": "hidrometro_tamper", "categoria": "seguranca",
+                      "uc": uc, "hidrometro": r["hidrometro"],
+                      "conta_portal": r["conta_portal"], "setor": r["setor"],
+                      "classe": r["classe"], "severidade": "high",
+                      "msg": "flag de adulteracao no hidrometro", "valor": 1}
+                client.publish(f"{TOPIC_EVT}/tamper", json.dumps(ev), qos=0)
+                print(f"[tamper] {uc} ({r['conta_portal']})", flush=True)
+
+
+def loop(client):
+    while True:
+        ciclo(client)
+        time.sleep(POLL_S)
+
+
+class Handler(BaseHTTPRequestHandler):
+    def _send(self, code, body):
+        b = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        p = urlparse(self.path).path
+        if p == "/health":
+            self._send(200, {"status": "ok", "service": "meter-sim-agua",
+                             "hidrometros": len(parque.hidrometros)})
+        elif p == "/snapshot":
+            self._send(200, ultimo)
+        else:
+            self._send(404, {"error": "not found"})
+
+    def do_POST(self):
+        u = urlparse(self.path)
+        if u.path != "/fraude":
+            return self._send(404, {"error": "not found"})
+        q = parse_qs(u.query)
+        uc = q.get("uc", [""])[0]
+        desvio = float(q.get("desvio", ["0.6"])[0])
+        tamper = q.get("tamper", ["true"])[0] != "false"
+        alvo = parque.forcar(uc, desvio, tamper)
+        self._send(200 if alvo else 400,
+                   {"status": "furto forcado" if alvo else "uc nao encontrada",
+                    "uc": alvo, "desvio": desvio, "tamper": tamper})
+
+    def do_DELETE(self):
+        u = urlparse(self.path)
+        if u.path != "/fraude":
+            return self._send(404, {"error": "not found"})
+        uc = parse_qs(u.query).get("uc", [""])[0]
+        alvo = parque.limpar_forcado(uc)
+        self._send(200 if alvo else 400,
+                   {"status": "furto limpo" if alvo else "uc nao encontrada", "uc": alvo})
+
+
+def conectar_mqtt():
+    c = mqtt.Client(client_id="meter-sim-agua")
+    for i in range(30):
+        try:
+            c.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
+            c.loop_start()
+            print(f"[meter-sim] MQTT {MQTT_HOST}:{MQTT_PORT} ok", flush=True)
+            return c
+        except Exception as e:
+            print(f"[meter-sim] aguardando MQTT ({i+1}/30): {e}", flush=True)
+            time.sleep(2)
+    raise SystemExit("MQTT indisponivel")
+
+
+def main():
+    client = conectar_mqtt()
+    threading.Thread(target=loop, args=(client,), daemon=True).start()
+    print(f"meter-sim agua | {len(parque.hidrometros)} hidrometros | "
+          f"sim={SIM_URL} poll={POLL_S}s | http :{HTTP_PORT}", flush=True)
+    ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler).serve_forever()
+
+
+if __name__ == "__main__":
+    main()
