@@ -1,0 +1,225 @@
+<dashboard version="2" theme="dark">
+  <label>Fusion OT - obs-lab</label>
+  <description>Fraude e risco do OT (energia) e a correlacao com a TI pela Unidade Consumidora.</description>
+  <definition><![CDATA[
+{
+  "title": "Fusion OT - obs-lab",
+  "description": "Fraude OT (furto, adulteracao, cyber) e a ponte com a TI pela UC. Fontes: ot_metrics (telemetria via Telegraf), ot (eventos), index=lab (fraude da web store). PENDENTE: validar com dado real - confirmar o metric_name (macro obs_lab_ot_metric).",
+  "dataSources": {
+    "ds_k_perda": {
+      "type": "ds.search",
+      "name": "ds_k_perda",
+      "options": {
+        "query": "| `obs_lab_ot_metric(\"ot_medidor.potencia_kw\")` by alimentador, uc span=1m | stats latest(valor) as kw by alimentador, uc | stats sum(kw) as medido by alimentador | join type=inner alimentador [ | `obs_lab_ot_metric(\"ot_alimentador.potencia_kw\")` by alimentador span=1m | stats latest(valor) as entregue by alimentador ] | eval nao_tec=(entregue-medido)-entregue*0.04 | stats sum(nao_tec) as kw | eval kw=round(kw,0)"
+      }
+    },
+    "ds_k_tamper": {
+      "type": "ds.search",
+      "name": "ds_k_tamper",
+      "options": {
+        "query": "`obs_lab_ot_eventos` evento=medidor_tamper | stats dc(uc) as ucs"
+      }
+    },
+    "ds_k_cyber": {
+      "type": "ds.search",
+      "name": "ds_k_cyber",
+      "options": {
+        "query": "`obs_lab_ot_cyber` | stats count as eventos"
+      }
+    },
+    "ds_k_coord": {
+      "type": "ds.search",
+      "name": "ds_k_coord",
+      "options": {
+        "query": "`obs_lab_ot_eventos` evento=medidor_tamper | stats values(conta_portal) as conta_portal by uc | join type=inner uc [ `obs_lab_uc_fraude_ti` | stats count by uc ] | stats dc(uc) as casos"
+      }
+    },
+    "ds_k_ativos": {
+      "type": "ds.search",
+      "name": "ds_k_ativos",
+      "options": {
+        "query": "| `obs_lab_ot_metric(\"ot_subestacao.alimentadores_ativos\")` span=1m | stats latest(valor) as ativos"
+      }
+    },
+    "ds_mapa_uc": {
+      "type": "ds.search",
+      "name": "ds_mapa_uc",
+      "options": {
+        "query": "| inputlookup obs_lab_uc | join type=left uc [ `obs_lab_ot_eventos` evento=medidor_tamper | stats count as tamper by uc ] | fillnull tamper value=0 | geostats latfield=lat longfield=lon globallimit=0 sum(tamper) as adulteracoes"
+      }
+    },
+    "ds_perda_al": {
+      "type": "ds.search",
+      "name": "ds_perda_al",
+      "options": {
+        "query": "| `obs_lab_ot_metric(\"ot_medidor.potencia_kw\")` by alimentador, uc span=1m | stats latest(valor) as kw by alimentador, uc | stats sum(kw) as medido by alimentador | join type=inner alimentador [ | `obs_lab_ot_metric(\"ot_alimentador.potencia_kw\")` by alimentador span=1m | stats latest(valor) as entregue by alimentador ] | eval medido=round(medido,0), entregue=round(entregue,0) | table alimentador, entregue, medido | sort alimentador"
+      }
+    },
+    "ds_telemetria": {
+      "type": "ds.search",
+      "name": "ds_telemetria",
+      "options": {
+        "query": "| `obs_lab_ot_metric(\"ot_subestacao.potencia_total_mw\")` span=1m | rename valor as \"Subestacao (MW)\""
+      }
+    },
+    "ds_eventos": {
+      "type": "ds.search",
+      "name": "ds_eventos",
+      "options": {
+        "query": "`obs_lab_ot_eventos` | eval hora=strftime(_time,\"%H:%M:%S\") | sort - _time | head 30 | table hora, categoria, severidade, feeder, uc, tipo, msg"
+      }
+    },
+    "ds_coord": {
+      "type": "ds.search",
+      "name": "ds_coord",
+      "options": {
+        "query": "`obs_lab_ot_eventos` evento=medidor_tamper | stats count as ot_tamper, values(conta_portal) as conta_portal, values(alimentador) as alimentador by uc | join type=inner uc [ `obs_lab_uc_fraude_ti` | stats count as ti_eventos, values(threat) as ameacas_ti, max(risk_score) as risk_ti by uc ] | eval caso=\"coordenado OT+TI\" | sort - risk_ti | table caso, uc, conta_portal, alimentador, ot_tamper, ameacas_ti, risk_ti, ti_eventos"
+      }
+    }
+  },
+  "visualizations": {
+    "viz_titulo": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "## FUSION OT - obs-lab\nFraude do OT (energia) numa visao so e **ligada a TI pela Unidade Consumidora**. Furto aparece no **balanco** (alimentador menos medidores), adulteracao e ataque cyber viram **evento**, e a mesma UC que furta no campo e fraudada no portal fecha o **caso coordenado**.",
+        "fontColor": "#e1e6eb"
+      }
+    },
+    "viz_k_perda": {
+      "type": "splunk.singlevalue",
+      "title": "Perda nao-tecnica (furto)",
+      "dataSources": { "primary": "ds_k_perda" },
+      "options": { "unit": "kW", "majorColor": "#f8be34" }
+    },
+    "viz_k_tamper": {
+      "type": "splunk.singlevalue",
+      "title": "Medidores adulterados",
+      "dataSources": { "primary": "ds_k_tamper" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_cyber": {
+      "type": "splunk.singlevalue",
+      "title": "Eventos cyber-OT",
+      "dataSources": { "primary": "ds_k_cyber" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_coord": {
+      "type": "splunk.singlevalue",
+      "title": "UCs coordenadas OT+TI",
+      "dataSources": { "primary": "ds_k_coord" },
+      "options": { "majorColor": "#dc4e41" }
+    },
+    "viz_k_ativos": {
+      "type": "splunk.singlevalue",
+      "title": "Alimentadores ativos",
+      "dataSources": { "primary": "ds_k_ativos" },
+      "options": {}
+    },
+    "viz_mapa": {
+      "type": "splunk.map",
+      "title": "Unidades consumidoras (bolha = adulteracoes)",
+      "dataSources": { "primary": "ds_mapa_uc" },
+      "options": {
+        "center": [ -20, -47 ],
+        "zoom": 4,
+        "baseLayerTileServer": "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+        "baseLayerTileServerType": "raster",
+        "layers": [
+          {
+            "type": "bubble",
+            "latitude": "> primary | seriesByName('latitude')",
+            "longitude": "> primary | seriesByName('longitude')",
+            "bubbleSize": "> primary | frameWithoutSeriesNames('_geo_bounds_east', '_geo_bounds_west', '_geo_bounds_north', '_geo_bounds_south', 'latitude', 'longitude')"
+          }
+        ]
+      }
+    },
+    "viz_perda": {
+      "type": "splunk.column",
+      "title": "Balanco por alimentador: entregue x medido (o buraco e o furto)",
+      "dataSources": { "primary": "ds_perda_al" },
+      "options": {
+        "legendDisplay": "bottom",
+        "seriesColorsByField": { "entregue": "#5ca3ff", "medido": "#53a051" }
+      }
+    },
+    "viz_telemetria": {
+      "type": "splunk.line",
+      "title": "Potencia da subestacao por minuto",
+      "dataSources": { "primary": "ds_telemetria" },
+      "options": { "legendDisplay": "off" }
+    },
+    "viz_eventos": {
+      "type": "splunk.table",
+      "title": "Eventos OT (seguranca e operacao)",
+      "dataSources": { "primary": "ds_eventos" },
+      "options": {
+        "count": 10,
+        "columnFormat": {
+          "severidade": {
+            "rowBackgroundColors": "> table | seriesByName(\"severidade\") | matchValue(sev)"
+          }
+        }
+      },
+      "context": {
+        "sev": [
+          { "match": "critical", "value": "#dc4e41" },
+          { "match": "high", "value": "#ec9960" },
+          { "match": "medium", "value": "#f8be34" },
+          { "match": "low", "value": "#53a051" }
+        ]
+      }
+    },
+    "viz_coord": {
+      "type": "splunk.table",
+      "title": "Casos coordenados OT+TI - a mesma UC furta no campo e e fraudada no portal",
+      "dataSources": { "primary": "ds_coord" },
+      "options": { "count": 15 }
+    },
+    "viz_nota": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "_Pendente de validacao ao vivo: as buscas de metrica usam o macro `obs_lab_ot_metric`; confirmar o metric_name com `| mstats ... by metric_name` quando o dado fluir. Eventos (index=ot) e a ponte com a TI (campo username) usam campos ja conhecidos._",
+        "fontColor": "#8a9aa9"
+      }
+    }
+  },
+  "inputs": {
+    "input_tempo": {
+      "type": "input.timerange",
+      "title": "Periodo",
+      "options": { "token": "tempo", "defaultValue": "-60m@m,now" }
+    }
+  },
+  "defaults": {
+    "dataSources": {
+      "ds.search": {
+        "options": {
+          "queryParameters": { "earliest": "$tempo.earliest$", "latest": "$tempo.latest$" }
+        }
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": { "width": 1600, "height": 1640, "display": "auto-scale" },
+    "structure": [
+      { "item": "viz_titulo", "type": "block", "position": { "x": 0, "y": 0, "w": 1600, "h": 80 } },
+      { "item": "viz_k_perda", "type": "block", "position": { "x": 0, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_tamper", "type": "block", "position": { "x": 325, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_cyber", "type": "block", "position": { "x": 650, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_coord", "type": "block", "position": { "x": 975, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_ativos", "type": "block", "position": { "x": 1300, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_mapa", "type": "block", "position": { "x": 0, "y": 210, "w": 800, "h": 430 } },
+      { "item": "viz_perda", "type": "block", "position": { "x": 810, "y": 210, "w": 790, "h": 430 } },
+      { "item": "viz_telemetria", "type": "block", "position": { "x": 0, "y": 650, "w": 1600, "h": 230 } },
+      { "item": "viz_eventos", "type": "block", "position": { "x": 0, "y": 890, "w": 1600, "h": 300 } },
+      { "item": "viz_coord", "type": "block", "position": { "x": 0, "y": 1200, "w": 1600, "h": 360 } },
+      { "item": "viz_nota", "type": "block", "position": { "x": 0, "y": 1570, "w": 1600, "h": 60 } }
+    ],
+    "globalInputs": [ "input_tempo" ]
+  }
+}
+  ]]></definition>
+  <meta type="hiddenElements"><![CDATA[{"hideEdit": false, "hideOpenInSearch": false, "hideExport": false}]]></meta>
+</dashboard>

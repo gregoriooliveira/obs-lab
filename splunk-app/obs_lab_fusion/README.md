@@ -20,8 +20,11 @@ Aparece em **Apps → obs-lab Fusion Center**.
 |---|---|
 | `lookups/obs_lab_geo.csv` | IP/CIDR → pais, cidade, lat/lon, `ator` (cliente/atacante) |
 | `lookups/obs_lab_threat.csv` | ameaca → dominio, MITRE ATT&CK, controle PCI DSS 4.0, LGPD |
-| `macros.conf` | `obs_lab_geo_enrich`, `obs_lab_threat_enrich` (globais) |
-| `data/ui/views/fusion_center.xml` | o painel |
+| `lookups/obs_lab_uc.csv` | UC → `conta_portal` (=username na TI), medidor, alimentador, geo — a **ponte OT↔TI** |
+| `macros.conf` | `obs_lab_geo_enrich`, `obs_lab_threat_enrich` + OT (`obs_lab_ot_eventos`, `obs_lab_ot_cyber`, `obs_lab_ot_metric`, `obs_lab_uc_fraude_ti`) |
+| `savedsearches.conf` | alertas OT: perda não-técnica, cyber, tamper, **coordenada OT+TI** |
+| `data/ui/views/fusion_center.xml` | o painel de TI |
+| `data/ui/views/obs_lab_ot_fusion.xml` | o painel de OT + correlação com a TI |
 
 ### Por que um lookup de geo
 
@@ -55,6 +58,22 @@ for ip in $(grep -oE "'(203\.0\.113|198\.51\.100|192\.0\.2)\.[0-9]+'" load-gen/i
 
 O mapa e de bolhas, nativo do Studio. Arcos origem→destino exigiriam o app
 Missile Map (Simple XML, sem manutencao) - ficou de fora de proposito.
+
+## Painel de OT (`obs_lab_ot_fusion`) e a ponte com a TI
+
+Fraude do OT (energia) e a correlacao com a TI pela **Unidade Consumidora**. A UC
+liga a conta do portal (`conta_portal` = `username` na TI) ao medidor/alimentador
+do OT (lookup `obs_lab_uc`). Blocos: perda não-técnica (balanço alimentador −
+medidores), mapa de UCs, telemetria da subestação, eventos (cyber/operação) e a
+tabela de **casos coordenados** (a mesma UC furta no campo e é fraudada no portal).
+Detalhe das famílias de fraude e do balanço: `ot/FRAUDE.md`.
+
+**Pendente de validação ao vivo** (precisa dos índices `ot`/`ot_metrics` com dado):
+o único ponto a confirmar é o `metric_name` da telemetria (macro
+`obs_lab_ot_metric`) — rode `| mstats avg(_value) WHERE index=ot_metrics by
+metric_name` e ajuste o macro se o Telegraf gravar só o campo (sem o measurement
+como prefixo). Eventos (`index=ot`) e a ponte com a TI (campo `username`) usam
+campos já conhecidos.
 
 ## Cadeia de credential stuffing
 

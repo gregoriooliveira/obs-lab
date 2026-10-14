@@ -1,4 +1,5 @@
 <nav search_view="search" color="#7b56db">
   <view name="fusion_center" default="true"/>
+  <view name="obs_lab_ot_fusion"/>
   <view name="search"/>
 </nav>

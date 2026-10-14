@@ -74,11 +74,15 @@ que nenhum dos dois centros isolados enxerga.
 - Eventos (segurança/operação/tamper) roteados por MQTT → Telegraf → índice `ot`.
 - Cenário coordenado no load-gen de TI (`fraudCoordinated`): fraude no portal nas
   contas `cust-001/014/019/037/054` — exatamente as UCs que furtam no OT.
+- **Lado Splunk** no app `obs_lab_fusion`: lookup `obs_lab_uc` (a ponte), macros OT
+  (`obs_lab_ot_eventos/_cyber/_metric`, `obs_lab_uc_fraude_ti`), 4 alertas
+  (`savedsearches.conf`) e o painel `obs_lab_ot_fusion` (Dashboard Studio).
 
 ## Pendências (precisam dos índices `ot`/`ot_metrics` e do dado fluindo)
 
-- View `obs_lab_ot_fusion` (Dashboard Studio): mapa por UC, perda por alimentador,
-  fila de UCs coordenadas, drill TI↔OT.
 - Criar os índices `ot` (eventos) e `ot_metrics` (métrica) e o token HEC que
   permite os dois.
-- Validar ao vivo o balanço e os eventos no Splunk (só com a VM OT no ar).
+- Confirmar o `metric_name` da telemetria com `| mstats ... by metric_name` e, se
+  preciso, ajustar só o macro `obs_lab_ot_metric` (é o único ponto não validável
+  offline; eventos e a ponte com a TI já usam campos conhecidos).
+- Validar ao vivo o balanço, os eventos e os 4 alertas no Splunk (com a VM OT no ar).
