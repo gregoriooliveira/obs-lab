@@ -19,6 +19,8 @@ Colunas:
   peso          float                participacao da UC na carga do alimentador
   furto         0|1                  a UC desvia energia (subnotifica consumo)
   desvio        float                fracao desviada quando furto=1 (0=nada)
+  essencial     ''|hospital|...      UC com servico essencial/eletrodependente
+                                     (prioridade maxima em interrupcao - REN 1.000)
 """
 import csv
 import os
@@ -73,7 +75,7 @@ def gerar():
                 "uc": f"UC-{uc_i:04d}", "conta_portal": conta,
                 "medidor": f"MED-{uc_i:04d}", "alimentador": alid,
                 "classe": classe, "cidade": cidade, "lat": jlat, "lon": jlon,
-                "peso": peso, "furto": 0, "desvio": 0.0,
+                "peso": peso, "furto": 0, "desvio": 0.0, "essencial": "",
             })
     # marca as UCs que furtam. Espalha pelos alimentadores (no max 2 por
     # alimentador) pra o mapa de perda nao-tecnica acender em varios pontos, mas
@@ -95,6 +97,16 @@ def gerar():
         if id(l) in alvos:
             l["furto"] = 1
             l["desvio"] = round(random.uniform(0.30, 0.65), 3)
+    # UCs de servico essencial / eletrodependente (prioridade de atendimento).
+    # Legitimas - escolhe entre as que NAO furtam, uma por alimentador-chave,
+    # deterministico (primeira UC limpa de cada alimentador alvo).
+    essenciais = [("AL-01", "hospital"), ("AL-02", "saneamento"),
+                  ("AL-03", "eletrodependente")]
+    for alid, tipo in essenciais:
+        for l in linhas:
+            if l["alimentador"] == alid and not l["furto"] and not l["essencial"]:
+                l["essencial"] = tipo
+                break
     return linhas
 
 
@@ -102,7 +114,7 @@ def main():
     linhas = gerar()
     out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "obs_lab_uc.csv")
     campos = ["uc", "conta_portal", "medidor", "alimentador", "classe",
-              "cidade", "lat", "lon", "peso", "furto", "desvio"]
+              "cidade", "lat", "lon", "peso", "furto", "desvio", "essencial"]
     with open(out, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=campos)
         w.writeheader()
@@ -114,6 +126,9 @@ def main():
         print(f"  {alid} {nome:12} {q:2} UCs")
     print(f"furtam: {len(furtam)} -> " +
           ", ".join(f"{l['uc']}({l['alimentador']},{l['desvio']})" for l in furtam))
+    ess = [l for l in linhas if l["essencial"]]
+    print(f"essenciais: {len(ess)} -> " +
+          ", ".join(f"{l['uc']}({l['alimentador']},{l['essencial']})" for l in ess))
 
 
 if __name__ == "__main__":

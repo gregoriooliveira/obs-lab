@@ -95,6 +95,39 @@ curl "http://<host>:8092/snapshot"   # leituras atuais dos medidores
 
 Regerar a tabela de UCs (muda nada se a seed for a mesma): `python gen_uc.py`.
 
+## Cenários de experiência, operação e atendimento
+
+A mesma falha que o lab já injeta vira sinais do **lado do cliente** e da
+**operação** — é o que sustenta os casos de uso "criativos" (ver
+[`../CASOS_DE_USO.md`](../CASOS_DE_USO.md)). Quase tudo sai sozinho do auto-fault;
+na mão:
+
+```bash
+# corte remoto em massa fora de janela (HES comprometido) -> UC-017
+curl -X POST "http://<host>:8092/corte_massa?n=20&janela=fora"
+# UC cortada que segue consumindo = religação à revelia -> UC-030
+curl -X POST "http://<host>:8092/cortar?uc=UC-0005&estado=cortada"
+curl -X POST "http://<host>:8092/cortar?uc=UC-0005&estado=ligada"   # religar
+# medidor sem comunicação (NOC da AMI) -> UC-022
+curl -X POST "http://<host>:8092/comms?uc=UC-0006&ok=false"
+curl -X POST "http://<host>:8092/comms?uc=UC-0006&ok=true"
+# mudança de config/firmware sem aprovação (cyber) -> UC-012
+curl -X POST "http://<host>:8091/fault?feeder=AL-02&tipo=config_change&dur=0"
+```
+
+Automáticos (na borda do evento, sem comando):
+
+| Sinal | Quando | Evento (MQTT → índice `ot`) | Caso |
+|---|---|---|---|
+| **last gasp** | alimentador cai (trip) | `evento=last_gasp` por UC | UC-006 |
+| **reclamação** | trip ou afundamento de tensão | `evento=reclamacao` (`motivo=falta\|tensao`, traz `conta_portal`) | UC-003/006/035 |
+| **religamento** | alimentador religa (0→1) | `evento=ot_religamento` por `feeder` | UC-025/027 |
+
+As UCs **essenciais** (`hospital`/`saneamento`/`eletrodependente`, coluna
+`essencial` no CSV) entram com severidade alta e sempre reclamam. O lookup
+`obs_lab_manutencao` (no app Splunk) marca o alimentador com equipe em campo para
+o alerta de **segurança do trabalho** (energização em trecho liberado, UC-025).
+
 ## Config do HMI (FUXA)
 
 Primeira vez, pela UI (http://host:1881):

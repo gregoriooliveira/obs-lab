@@ -1,0 +1,115 @@
+<dashboard version="2" theme="dark">
+  <label>Experiencia e Operacao OT - energia</label>
+  <description>A falha de OT que o lab injeta vista pelo cliente: reclamacao no portal, last gasp, religamento, corte, UC essencial, religacao a revelia - e a cadeia de TI (portal/LGPD).</description>
+  <definition><![CDATA[
+{
+  "title": "Experiencia e Operacao OT - energia",
+  "description": "Casos 'criativos' do lab: a mesma falha injetada no OT vira reclamacao no portal (ponte com a TI pela conta_portal), last gasp, religamento, corte em massa, UC essencial afetada e religacao a revelia. Mais a cadeia de TI (endpoint parado, acesso massivo/LGPD). Metricas dependem do metric_name real (macro obs_lab_ot_metric).",
+  "dataSources": {
+    "ds_k_reclama": { "type": "ds.search", "options": { "query": "`obs_lab_ot_reclamacoes` | stats dc(uc) as v" } },
+    "ds_k_essencial": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` (evento=last_gasp OR evento=reclamacao) essencial=* | stats dc(uc) as v" } },
+    "ds_k_comms": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` evento=medidor_sem_comunicacao | stats dc(uc) as v" } },
+    "ds_k_relig": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` evento=ot_religamento | stats count as v" } },
+    "ds_k_config": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` evento=ot_config_change mudanca_aprovada=0 | stats count as v" } },
+    "ds_reclama_al": { "type": "ds.search", "options": { "query": "`obs_lab_ot_reclamacoes` | chart count over alimentador by motivo" } },
+    "ds_lastgasp": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` evento=last_gasp | stats dc(uc) as medidores_sem_energia, values(essencial) as essenciais by alimentador | sort - medidores_sem_energia" } },
+    "ds_relig_suc": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` evento=ot_religamento | stats count as religamentos, latest(_time) as ultimo by feeder | eval ultimo=strftime(ultimo,\"%H:%M:%S\") | sort - religamentos" } },
+    "ds_essencial": { "type": "ds.search", "options": { "query": "`obs_lab_ot_eventos` (evento=last_gasp OR evento=reclamacao) essencial=* | stats count as eventos, values(essencial) as tipo, values(evento) as sinais, latest(msg) as detalhe by uc, alimentador, conta_portal | sort - eventos" } },
+    "ds_revelia": { "type": "ds.search", "options": { "query": "| `obs_lab_ot_metric(\"ot_medidor.potencia_kw\")` situacao=cortada by uc, alimentador, conta_portal span=1m | stats latest(valor) as consumo_kw by uc, alimentador, conta_portal | where consumo_kw > 0.1 | sort - consumo_kw" } },
+    "ds_ti_cadeia": { "type": "ds.search", "options": { "query": "`obs_lab_http` | stats count as req, max(_time) as ult by http_path | eval mins_sem_trafego=round((now()-ult)/60,1) | where req > 5 AND mins_sem_trafego > 3 | sort - mins_sem_trafego" } },
+    "ds_ti_lgpd": { "type": "ds.search", "options": { "query": "`obs_lab_security` | stats dc(username) as contas_distintas, count as tentativas, values(threat) as ameacas by client_ip | where contas_distintas >= 10 | sort - contas_distintas" } }
+  },
+  "visualizations": {
+    "viz_titulo": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "## EXPERIENCIA & OPERACAO OT - energia\nA mesma falha que o lab injeta no campo vista pelo **cliente** e pela **operacao**: reclamacao no portal (ponte com a TI pela `conta_portal`), interrupcao detectada por *last gasp* antes da ligacao, religamentos, corte em massa, UC essencial e religacao a revelia. No rodape, a cadeia de **TI** (portal/LGPD).",
+        "fontColor": "#e1e6eb"
+      }
+    },
+    "viz_k_reclama": { "type": "splunk.singlevalue", "title": "Reclamacoes (UCs)", "dataSources": { "primary": "ds_k_reclama" }, "options": { "majorColor": "#f8be34" } },
+    "viz_k_essencial": { "type": "splunk.singlevalue", "title": "UCs essenciais afetadas", "dataSources": { "primary": "ds_k_essencial" }, "options": { "majorColor": "#dc4e41" } },
+    "viz_k_comms": { "type": "splunk.singlevalue", "title": "Medidores sem comunicacao", "dataSources": { "primary": "ds_k_comms" }, "options": {} },
+    "viz_k_relig": { "type": "splunk.singlevalue", "title": "Religamentos", "dataSources": { "primary": "ds_k_relig" }, "options": {} },
+    "viz_k_config": { "type": "splunk.singlevalue", "title": "Config change sem aprovacao", "dataSources": { "primary": "ds_k_config" }, "options": { "majorColor": "#dc4e41" } },
+    "viz_reclama_al": {
+      "type": "splunk.column",
+      "title": "Reclamacoes no portal por alimentador e motivo",
+      "dataSources": { "primary": "ds_reclama_al" },
+      "options": { "stackMode": "stacked", "legendDisplay": "bottom", "seriesColorsByField": { "falta": "#dc4e41", "tensao": "#f8be34" } }
+    },
+    "viz_lastgasp": {
+      "type": "splunk.table",
+      "title": "Interrupcao provavel - medidores sem energia (last gasp) por alimentador",
+      "dataSources": { "primary": "ds_lastgasp" },
+      "options": { "count": 10 }
+    },
+    "viz_relig_suc": {
+      "type": "splunk.table",
+      "title": "Religamentos sucessivos por alimentador",
+      "dataSources": { "primary": "ds_relig_suc" },
+      "options": { "count": 10 }
+    },
+    "viz_essencial": {
+      "type": "splunk.table",
+      "title": "UC essencial / eletrodependente afetada (prioridade de atendimento)",
+      "dataSources": { "primary": "ds_essencial" },
+      "options": { "count": 10 }
+    },
+    "viz_revelia": {
+      "type": "splunk.table",
+      "title": "Religacao a revelia - consumo em UC cortada (situacao=cortada x potencia>0)",
+      "dataSources": { "primary": "ds_revelia" },
+      "options": { "count": 10 }
+    },
+    "viz_ti_cadeia": {
+      "type": "splunk.table",
+      "title": "TI - rota do portal sem trafego (interface caiu a zero)",
+      "dataSources": { "primary": "ds_ti_cadeia" },
+      "options": { "count": 10 }
+    },
+    "viz_ti_lgpd": {
+      "type": "splunk.table",
+      "title": "TI - acesso massivo a contas no portal (LGPD / stuffing)",
+      "dataSources": { "primary": "ds_ti_lgpd" },
+      "options": { "count": 10 }
+    },
+    "viz_nota": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "_A reclamacao e o last gasp sao gerados pelo meter-sim quando o alimentador cai ou a tensao afunda - a falha e real, o ticket do cliente e sintetico. A religacao a revelia e metrica (depende do metric_name - macro `obs_lab_ot_metric`). Os dois paineis de TI leem o dado da web store que o lab ja produz (`obs_lab_http`, `obs_lab_security`)._",
+        "fontColor": "#8a9aa9"
+      }
+    }
+  },
+  "inputs": {
+    "input_tempo": { "type": "input.timerange", "title": "Periodo", "options": { "token": "tempo", "defaultValue": "-60m@m,now" } }
+  },
+  "defaults": {
+    "dataSources": { "ds.search": { "options": { "queryParameters": { "earliest": "$tempo.earliest$", "latest": "$tempo.latest$" } } } }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": { "width": 1600, "height": 1560, "display": "auto-scale" },
+    "structure": [
+      { "item": "viz_titulo", "type": "block", "position": { "x": 0, "y": 0, "w": 1600, "h": 80 } },
+      { "item": "viz_k_reclama", "type": "block", "position": { "x": 0, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_essencial", "type": "block", "position": { "x": 325, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_comms", "type": "block", "position": { "x": 650, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_relig", "type": "block", "position": { "x": 975, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_k_config", "type": "block", "position": { "x": 1300, "y": 90, "w": 300, "h": 110 } },
+      { "item": "viz_reclama_al", "type": "block", "position": { "x": 0, "y": 210, "w": 790, "h": 340 } },
+      { "item": "viz_lastgasp", "type": "block", "position": { "x": 810, "y": 210, "w": 790, "h": 340 } },
+      { "item": "viz_relig_suc", "type": "block", "position": { "x": 0, "y": 560, "w": 520, "h": 300 } },
+      { "item": "viz_essencial", "type": "block", "position": { "x": 535, "y": 560, "w": 1065, "h": 300 } },
+      { "item": "viz_revelia", "type": "block", "position": { "x": 0, "y": 870, "w": 1600, "h": 280 } },
+      { "item": "viz_ti_cadeia", "type": "block", "position": { "x": 0, "y": 1160, "w": 790, "h": 320 } },
+      { "item": "viz_ti_lgpd", "type": "block", "position": { "x": 810, "y": 1160, "w": 790, "h": 320 } },
+      { "item": "viz_nota", "type": "block", "position": { "x": 0, "y": 1490, "w": 1600, "h": 60 } }
+    ],
+    "globalInputs": [ "input_tempo" ]
+  }
+}
+  ]]></definition>
+  <meta type="hiddenElements"><![CDATA[{"hideEdit": false, "hideOpenInSearch": false, "hideExport": false}]]></meta>
+</dashboard>

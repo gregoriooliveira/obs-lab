@@ -13,6 +13,7 @@ Telegraf, nunca aqui - o meter-sim so fala MQTT e HTTP interno.
 """
 import json
 import os
+import random
 import threading
 import time
 import urllib.request
@@ -34,6 +35,17 @@ TOPIC_EVT = "ot/energia/evento"
 parque = ParqueMedidores()
 ultimo = {}            # uc -> ultima leitura, pra o /snapshot de controle
 tamper_anterior = {}   # uc -> bool, pra so emitir evento na BORDA (mudou de estado)
+comms_anterior = {}    # uc -> bool (comunicando), pra emitir sem_comunicacao na borda
+feeders_ant = {}       # ultimo snapshot de alimentadores, pra detectar falta/religa
+_client = None         # cliente MQTT, compartilhado com o HTTP de controle
+
+
+def publicar_evento(ev):
+    """Publica um evento no topico da sua categoria (o Telegraf roteia pro indice ot)."""
+    if _client is None:
+        return
+    cat = ev.get("categoria", "operacao")
+    _client.publish(f"{TOPIC_EVT}/{cat}", json.dumps(ev), qos=0)
 
 
 def snapshot_sim():
@@ -42,18 +54,40 @@ def snapshot_sim():
 
 
 def ciclo(client):
-    global ultimo
+    global ultimo, feeders_ant
     try:
         snap = snapshot_sim()
     except Exception as e:
         print(f"[meter-sim] process-sim indisponivel: {e}", flush=True)
         return
     feeders = snap.get("alimentadores", {})
+    # eventos de EXPERIENCIA na borda: last gasp + reclamacao no portal quando o
+    # alimentador cai ou a tensao afunda. Compara com o snapshot anterior.
+    if feeders_ant:
+        for ev in parque.eventos_de_falta(feeders_ant, feeders):
+            publicar_evento(ev)
+            if ev["evento"] == "reclamacao":
+                print(f"[reclamacao] {ev['uc']} ({ev['conta_portal']}) {ev['motivo']}", flush=True)
+    feeders_ant = feeders
     leituras = parque.ler(feeders, POLL_S)
     agora = ultimo = {}
     for r in leituras:
         uc = r["uc"]
         agora[uc] = r
+        m = parque._buscar(uc)
+        comunicando = m.comunicando if m else True
+        # comunicacao: evento na borda; medidor sem comunicacao nao publica metrica
+        # (e assim a taxa de leitura cai - o sinal do NOC da AMI).
+        if comunicando != comms_anterior.get(uc, True):
+            comms_anterior[uc] = comunicando
+            if not comunicando:
+                publicar_evento({"evento": "medidor_sem_comunicacao",
+                                 "categoria": "operacao", "severidade": "low",
+                                 "uc": uc, "medidor": r["medidor"],
+                                 "alimentador": r["alimentador"],
+                                 "msg": "medidor parou de comunicar", "valor": 1})
+        if not comunicando:
+            continue
         # a perda nao-tecnica e verdade interna do lab; nao vai no fio (o medidor
         # nao se denuncia). O Splunk a RECONSTROI pelo balanco alimentador-medidor.
         payload = {k: v for k, v in r.items() if k != "perda_nao_tecnica_kw"}
@@ -102,16 +136,55 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        if u.path != "/fraude":
-            return self._send(404, {"error": "not found"})
         q = parse_qs(u.query)
-        uc = q.get("uc", [""])[0]
-        desvio = float(q.get("desvio", ["0.6"])[0])
-        tamper = q.get("tamper", ["true"])[0] != "false"
-        alvo = parque.forcar(uc, desvio, tamper)
-        self._send(200 if alvo else 400,
-                   {"status": "furto forcado" if alvo else "uc nao encontrada",
-                    "uc": alvo, "desvio": desvio, "tamper": tamper})
+        if u.path == "/fraude":
+            uc = q.get("uc", [""])[0]
+            desvio = float(q.get("desvio", ["0.6"])[0])
+            tamper = q.get("tamper", ["true"])[0] != "false"
+            alvo = parque.forcar(uc, desvio, tamper)
+            return self._send(200 if alvo else 400,
+                       {"status": "furto forcado" if alvo else "uc nao encontrada",
+                        "uc": alvo, "desvio": desvio, "tamper": tamper})
+        if u.path == "/cortar":
+            # marca a UC como cortada no cadastro. Se continuar consumindo, o
+            # Splunk acusa religacao a revelia (situacao=cortada x potencia>0).
+            uc = q.get("uc", [""])[0]
+            estado = q.get("estado", ["cortada"])[0]
+            janela = q.get("janela", ["dentro"])[0]
+            alvo = parque.cortar(uc, estado)
+            if alvo and estado == "cortada":
+                m = parque._buscar(alvo)
+                publicar_evento({"evento": "corte_remoto", "categoria": "operacao",
+                                 "severidade": "medium", "uc": alvo,
+                                 "conta_portal": m.conta_portal, "alimentador": m.alimentador,
+                                 "janela": janela, "msg": f"corte remoto ({janela} de janela)",
+                                 "valor": 1})
+            return self._send(200 if alvo else 400,
+                       {"status": "ok" if alvo else "uc nao encontrada",
+                        "uc": alvo, "estado": estado})
+        if u.path == "/corte_massa":
+            # dispara um lote de cortes remotos (fora de janela por padrao) - o
+            # cenario de HES comprometido/integracao em pane (UC-017).
+            n = int(q.get("n", ["20"])[0])
+            janela = q.get("janela", ["fora"])[0]
+            alvos = random.sample(parque.medidores, min(n, len(parque.medidores)))
+            for m in alvos:
+                m.situacao = "cortada"
+                publicar_evento({"evento": "corte_remoto", "categoria": "operacao",
+                                 "severidade": "medium", "uc": m.uc,
+                                 "conta_portal": m.conta_portal, "alimentador": m.alimentador,
+                                 "janela": janela, "msg": f"corte remoto em massa ({janela} de janela)",
+                                 "valor": 1})
+            return self._send(200, {"status": "corte em massa", "n": len(alvos), "janela": janela})
+        if u.path == "/comms":
+            # liga/desliga a comunicacao de um medidor (NOC da AMI, UC-022).
+            uc = q.get("uc", [""])[0]
+            ok = q.get("ok", ["false"])[0] != "false"
+            alvo = parque.set_comunicacao(uc, ok)
+            return self._send(200 if alvo else 400,
+                       {"status": "ok" if alvo else "uc nao encontrada",
+                        "uc": alvo, "comunicando": ok})
+        return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
         u = urlparse(self.path)
@@ -138,7 +211,9 @@ def conectar_mqtt():
 
 
 def main():
+    global _client
     client = conectar_mqtt()
+    _client = client
     threading.Thread(target=loop, args=(client,), daemon=True).start()
     print(f"meter-sim energia | {len(parque.medidores)} medidores | "
           f"sim={SIM_URL} poll={POLL_S}s | http :{HTTP_PORT}", flush=True)

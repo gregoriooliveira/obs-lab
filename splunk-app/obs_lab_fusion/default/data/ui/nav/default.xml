@@ -2,5 +2,6 @@
   <view name="fusion_center" default="true"/>
   <view name="obs_lab_ot_geral"/>
   <view name="obs_lab_ot_fusion"/>
+  <view name="obs_lab_ot_experiencia"/>
   <view name="search"/>
 </nav>

@@ -50,12 +50,15 @@ FAULTS = ["overload", "sag", "trip"]
 EVENTOS = {
     "unauth_command": ("seguranca", "critical", "comando de abertura nao autorizado no disjuntor"),
     "spoof":          ("seguranca", "high",     "telemetria do alimentador falseada (leitura congelada)"),
+    "config_change":  ("seguranca", "high",     "mudanca de parametro/firmware no rele sem mudanca aprovada"),
     "trip":           ("operacao",  "medium",   "disjuntor abriu por protecao"),
     "overload":       ("operacao",  "medium",   "sobrecarga no alimentador"),
     "sag":            ("operacao",  "low",      "afundamento de tensao na subestacao"),
+    "religamento":    ("operacao",  "low",      "alimentador reenergizado (religamento)"),
 }
 _mqc = None
 eventos = []     # ultimos eventos, pro /events
+status_ant = {}  # feeder -> status anterior, pra detectar religamento (0 -> 1)
 
 
 def mqtt_conectar():
@@ -128,20 +131,50 @@ def write_snapshot(ctx, snap):
             f["potencia_kvar"], f["carga_pct"], f["status"]]))
 
 
+def emit_religamento(fid):
+    """Evento de reenergizacao (status 0 -> 1). Sustenta a contagem de religamentos
+    sucessivos (UC-027) e o alerta de energizacao em trecho com equipe (UC-025)."""
+    cat, sev, msg = EVENTOS["religamento"]
+    emit_event({"evento": "ot_religamento", "categoria": cat, "severidade": sev,
+                "feeder": fid, "tipo": "religamento", "msg": msg, "valor": 1})
+
+
+def detectar_religamento(snap):
+    """Compara o status de cada alimentador com o ciclo anterior e emite
+    religamento na borda 0 -> 1 (o alimentador religou apos um trip)."""
+    global status_ant
+    for fid in FEEDER_IDS:
+        s = int(snap["alimentadores"][fid]["status"])
+        if status_ant.get(fid, 1) == 0 and s == 1:
+            emit_religamento(fid)
+        status_ant[fid] = s
+
+
 def updater(ctx):
     global last_snapshot
     while True:
         snap = sub.update()
         last_snapshot = snap
         write_snapshot(ctx, snap)
+        detectar_religamento(snap)
         if AUTO_FAULT and random.random() < AUTO_PROB:
             if random.random() < CYBER_PROB:            # uma fracao e ataque cyber
+                tipo = random.choice(["unauth_command", "spoof", "config_change"])
                 alvo = random.choice(FEEDER_IDS)
-                tipo = random.choice(["unauth_command", "spoof"])
+                if tipo == "config_change":
+                    # nao e falha fisica (nao passa pelo sub.inject): e evento puro.
+                    # mudanca_aprovada=0 na maioria (sem ordem de mudanca) = o alerta.
+                    cat, sev, msg = EVENTOS["config_change"]
+                    aprovada = 1 if random.random() < 0.2 else 0
+                    emit_event({"evento": "ot_config_change", "categoria": cat,
+                                "severidade": sev, "feeder": alvo, "tipo": "config_change",
+                                "mudanca_aprovada": aprovada, "msg": msg, "valor": 1})
+                else:
+                    do_inject(alvo, tipo, random.randint(20, 60))
             else:                                        # o resto e operacao
                 alvo = random.choice(FEEDER_IDS + ["subestacao"])
                 tipo = "sag" if alvo == "subestacao" else random.choice(FAULTS)
-            do_inject(alvo, tipo, random.randint(20, 60))
+                do_inject(alvo, tipo, random.randint(20, 60))
         time.sleep(UPDATE_S)
 
 
